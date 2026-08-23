@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>İade Politikası — MalikYayın</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070B14; --card:#111827; --card-line:#1E2A3A;
+    --ink:#E8F0FF; --muted:#8BA3C7;
+    --cyan:#22D3EE; --violet:#A78BFA; --gold:#FBBF24;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',-apple-system,Segoe UI,sans-serif; background:var(--bg); color:var(--ink); line-height:1.7; }
+  a{ color:var(--gold); }
+  .glow{
+    position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(600px 400px at 15% 0%, rgba(34,211,238,.12), transparent 60%),
+      radial-gradient(700px 500px at 85% 20%, rgba(167,139,250,.14), transparent 60%);
+  }
+  nav{ position:sticky; top:0; z-index:50; background:rgba(7,11,20,.78); backdrop-filter:blur(14px); border-bottom:1px solid var(--card-line); }
+  .nav-inner{ display:flex; align-items:center; justify-content:space-between; padding:16px 24px; max-width:760px; margin:0 auto; }
+  .logo{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; display:flex; align-items:center; gap:9px; text-decoration:none; color:var(--ink); }
+  .logo-dot{ width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,var(--cyan),var(--violet)); box-shadow:0 0 14px rgba(34,211,238,.7); }
+  .back{ font-size:13px; color:var(--muted); text-decoration:none; }
+  .wrap{ max-width:720px; margin:0 auto; padding:48px 24px 80px; }
+  h1{ font-family:'Space Grotesk',sans-serif; font-size:clamp(26px,4vw,34px); margin:0 0 6px; }
+  .updated{ color:var(--muted); font-size:12.5px; margin:0 0 36px; }
+  h2{ font-family:'Space Grotesk',sans-serif; font-size:18px; margin:32px 0 10px; }
+  p, li{ color:#C5D4E8; font-size:14.5px; }
+  ul{ padding-left:20px; margin:10px 0; }
+  li{ margin-bottom:6px; }
+  .note{
+    background:var(--card); border:1px solid var(--card-line); border-radius:14px;
+    padding:18px; margin-top:28px; font-size:13.5px; color:var(--muted);
+  }
+  footer{ border-top:1px solid var(--card-line); padding:26px 0; margin-top:40px; }
+  .footer-inner{ max-width:720px; margin:0 auto; padding:0 24px; font-size:12.5px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<nav>
+  <div class="nav-inner">
+    <a class="logo" href="/"><span class="logo-dot"></span>MalikYayın</a>
+    <a class="back" href="/">← Ana sayfa</a>
+  </div>
+</nav>
+<div class="wrap">
+  <h1>İade Politikası</h1>
+  <p class="updated">Son güncelleme: Ağustos 2026</p>
+  <p>MalikYayın, dijital bir lisans (KEY) hizmeti sunar. Bu hizmetin dijital ve anlık olarak teslim edilen niteliği nedeniyle iade süreci aşağıdaki şartlara tabidir.</p>
+
+  <h2>1. KEY teslimi</h2>
+  <p>KEY, ödeme PayTR üzerinden onaylandıktan sonra kayıtlı e-posta adresinize iletilir. KEY iletildiği andan itibaren hizmet ifa edilmiş sayılır.</p>
+
+  <h2>2. İade koşulları</h2>
+  <ul>
+    <li>KEY hiç kullanılmamışsa (uygulamaya hiç girilmemişse) satın alımdan sonraki <strong>24 saat</strong> içinde talep edilen iadeler değerlendirilir.</li>
+    <li>KEY bir kez uygulamaya girilip aktifleştirildiyse, dijital hizmet ifa edilmiş sayıldığından iade yapılamaz.</li>
+    <li>Teknik bir arıza nedeniyle KEY hiç çalışmıyorsa (geçersiz KEY, sunucu hatası vb.) sorun giderilene kadar ücretsiz destek sağlanır; sorun çözülemezse tam iade yapılır.</li>
+  </ul>
+
+  <h2>3. İade talebi nasıl yapılır?</h2>
+  <p>İade talebiniz için <a href="mailto:maliksponsorluk@gmail.com">maliksponsorluk@gmail.com</a> adresine, ödeme bilgilerinizi (sipariş / işlem no, e-posta) ve talebinizin gerekçesini belirterek yazınız. Talepler en geç 3 iş günü içinde değerlendirilir.</p>
+
+  <h2>4. Ödemenin iadesi</h2>
+  <p>Onaylanan iadeler, ödemenin yapıldığı kart/hesaba, bankanızın işlem sürelerine bağlı olarak genellikle 3–10 iş günü içinde yansır. İade işlemi PayTR üzerinden gerçekleştirilir.</p>
+
+  <div class="note">
+    Bu politika, Türkiye’de mesafeli sözleşmeler ve dijital içerik/hizmet satışına ilişkin mevzuata uygun şekilde hazırlanmıştır. Sorularınız için <a href="iletisim.html">iletişim sayfamızdan</a> bize ulaşabilirsiniz.
+  </div>
+</div>
+<footer>
+  <div class="footer-inner">© 2026 MalikYayın — TikTok LIVE Hediye Overlay</div>
+</footer>
+</body>
+</html>
