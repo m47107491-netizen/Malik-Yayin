@@ -1,7 +1,7 @@
 {
   "name": "malikyayin-backend",
   "version": "1.0.0",
-  "description": "MalikYay\u0131n - e-posta do\u011frulama kodu ile kay\u0131t/giri\u015f + PayTR \u00f6deme entegrasyonu",
+  "description": "MalikYayın - e-posta doğrulama kodu ile kayıt/giriş + PayTR ödeme entegrasyonu",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -20,6 +20,6 @@
     "nodemailer": "^6.9.13"
   },
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   }
 }
