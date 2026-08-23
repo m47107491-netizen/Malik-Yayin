@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MalikYayın — Admin Paneli</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0710; --card:#171020; --card-line:#2A1F38; --card-soft:#1D1428;
+    --ink:#F5EEFA; --muted:#9C8BAE;
+    --pink:#FF2D78; --purple:#7C3AED; --gold:#FFC24B; --green:#3DDC97; --red:#FF5C6C;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Inter',-apple-system,Segoe UI,sans-serif;
+    background:var(--bg); color:var(--ink); min-height:100vh;
+  }
+  .disp{ font-family:'Space Grotesk',sans-serif; }
+  .mono{ font-family:'JetBrains Mono',monospace; }
+
+  .glow{
+    position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(600px 400px at 10% 0%, rgba(255,45,120,.14), transparent 60%),
+      radial-gradient(700px 500px at 90% 15%, rgba(124,58,237,.16), transparent 60%);
+  }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 24px; border-bottom:1px solid var(--card-line);
+    background:rgba(11,7,16,.75); backdrop-filter:blur(14px); position:sticky; top:0; z-index:20;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px; }
+  .brand .dot{ width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,var(--pink),var(--purple)); box-shadow:0 0 14px rgba(255,45,120,.7); }
+  .brand small{ font-family:'Inter',sans-serif; font-weight:500; font-size:12px; color:var(--muted); margin-left:2px; }
+
+  .wrap{ max-width:760px; margin:0 auto; padding:28px 20px 60px; }
+  .card{
+    background:var(--card); border:1px solid var(--card-line); border-radius:18px;
+    padding:24px; margin-bottom:20px;
+  }
+  h2{ margin:0 0 18px; font-size:16px; font-family:'Space Grotesk',sans-serif; display:flex; align-items:center; gap:8px; }
+  label{ display:block; font-size:12.5px; color:var(--muted); margin-bottom:6px; font-weight:500; }
+  input[type=text],input[type=email],input[type=password],input[type=number]{
+    width:100%; padding:13px 14px; border:1px solid var(--card-line); border-radius:11px;
+    font-size:14.5px; margin-bottom:14px; background:var(--card-soft); color:var(--ink);
+    font-family:inherit; outline:none; transition:border-color .15s;
+  }
+  input:focus{ border-color:var(--pink); }
+  input::placeholder{ color:#59475F; }
+
+  button{
+    border:none; border-radius:11px; padding:14px; font-size:13.5px; font-weight:600;
+    cursor:pointer; width:100%; color:#fff; margin-bottom:10px; font-family:inherit;
+    transition:transform .12s, opacity .12s;
+  }
+  button:hover{ opacity:.92; }
+  button:active{ transform:scale(.98); }
+  .row{ display:flex; gap:10px; }
+  .row button{ margin-bottom:0; }
+
+  .btn-gradient{ background:linear-gradient(135deg,var(--pink),var(--purple)); }
+  .btn-green{ background:#1E7A54; }
+  .btn-purple{ background:#5B3FA8; }
+  .btn-gold{ background:linear-gradient(135deg,#B8862F,#8C6018); color:#1A1206; }
+  .btn-dark{ background:#241A30; border:1px solid var(--card-line); }
+  .btn-red{ background:transparent; border:1px solid rgba(255,92,108,.4); color:var(--red); }
+  .btn-red:hover{ background:rgba(255,92,108,.08); }
+
+  .keybox{
+    background:var(--card-soft); border:1px dashed rgba(61,220,151,.4); border-radius:12px; padding:14px;
+    font-size:14.5px; color:var(--green); margin-bottom:4px; word-break:break-all;
+  }
+  .hint{ font-size:12px; color:var(--muted); margin:-2px 0 14px; line-height:1.5; }
+
+  #err{ color:var(--red); font-size:13px; min-height:18px; margin-bottom:4px; }
+  #loginScreen, #panelScreen{ display:none; }
+
+  .stat-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .stat-box{ background:var(--card-soft); border-radius:12px; padding:16px; text-align:center; }
+  .stat-box b{ display:block; font-family:'Space Grotesk',sans-serif; font-size:22px; margin-bottom:2px; }
+  .stat-box span{ font-size:11.5px; color:var(--muted); }
+
+  .search-row{ display:flex; gap:10px; margin-bottom:16px; }
+  .search-row input{ margin-bottom:0; }
+  .filter-chip{
+    padding:9px 14px; border-radius:100px; font-size:12.5px; font-weight:600; white-space:nowrap;
+    background:var(--card-soft); border:1px solid var(--card-line); color:var(--muted); cursor:pointer;
+  }
+  .filter-chip.active{ background:rgba(255,45,120,.14); border-color:rgba(255,45,120,.4); color:#fff; }
+
+  .keyrow{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:14px 0; border-bottom:1px solid var(--card-line); font-size:13px;
+  }
+  .keyrow:last-child{ border-bottom:none; }
+  .keyrow .kid{ font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; }
+  .keyrow .meta{ color:var(--muted); font-size:11.5px; margin-top:3px; }
+  .tag{ padding:4px 10px; border-radius:100px; font-size:10.5px; font-weight:700; letter-spacing:.02em; }
+  .tag-ok{ background:rgba(61,220,151,.14); color:var(--green); }
+  .tag-dead{ background:rgba(255,92,108,.14); color:var(--red); }
+  .tag-admin{ background:rgba(255,194,75,.14); color:var(--gold); margin-right:6px; }
+  .small-x{
+    background:transparent; border:1px solid rgba(255,92,108,.35); color:var(--red);
+    border-radius:8px; padding:7px 11px; font-size:11px; cursor:pointer; width:auto; margin:0;
+  }
+  .empty-state{ text-align:center; padding:30px 10px; color:var(--muted); font-size:13.5px; }
+
+  .logout-link{
+    display:block; text-align:center; font-size:13px; color:var(--muted); margin-top:8px; cursor:pointer;
+  }
+  .logout-link:hover{ color:var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="glow"></div>
+
+<header>
+  <div class="brand"><span class="dot"></span>MalikYayın <small>Admin</small></div>
+</header>
+
+<div class="wrap">
+
+  <!-- LOGIN -->
+  <div class="card" id="loginScreen" style="max-width:420px; margin:60px auto 0;">
+    <h2>🔒 Giriş Yap</h2>
+    <label>E-posta</label>
+    <input type="email" id="loginEmail" placeholder="admin@ornek.com">
+    <label>Şifre</label>
+    <input type="password" id="loginPass" placeholder="••••••••">
+    <div id="err"></div>
+    <button class="btn-gradient" onclick="doLogin()">Giriş yap</button>
+  </div>
+
+  <!-- PANEL -->
+  <div id="panelScreen">
+
+    <div class="card">
+      <h2>📊 İstatistikler</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><b id="statToplam">—</b><span>Toplam KEY</span></div>
+        <div class="stat-box"><b id="statAktif" style="color:var(--green)">—</b><span>Aktif</span></div>
+        <div class="stat-box"><b id="statDolmus" style="color:var(--red)">—</b><span>Süresi dolmuş</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🗝️ KEY Üret</h2>
+      <div class="row" style="margin-bottom:10px;">
+        <button class="btn-purple" onclick="generateKey(1,false)">1 günlük</button>
+        <button class="btn-purple" onclick="generateKey(7,false)">7 günlük</button>
+      </div>
+      <div class="row" style="margin-bottom:14px;">
+        <button class="btn-green" onclick="generateKey(30,false)">1 aylık</button>
+        <button class="btn-green" onclick="generateKey(-1,false)">Sınırsız</button>
+      </div>
+      <label>Özel süre (gün)</label>
+      <input type="number" id="ozelGun" placeholder="örn. 45">
+      <button class="btn-dark" onclick="generateCustom()">Özel süre üret</button>
+      <div class="hint">Aşağıdaki kutu "admin key" üretir — bu key'i giren kullanıcı uygulamada admin paneline (görsel yönetimi) erişir. Sadece güvendiğin kişilere ver.</div>
+      <button class="btn-gold" onclick="generateAdminKey()">👑 Admin key üret (1 aylık)</button>
+      <div class="keybox" id="lastKey">Henüz key üretilmedi</div>
+    </div>
+
+    <div class="card">
+      <h2>📋 Üretilen Key'ler</h2>
+      <div class="search-row">
+        <input type="text" id="searchBox" placeholder="Key ara..." oninput="renderKeyList()">
+      </div>
+      <div class="row" style="margin-bottom:16px; gap:8px;">
+        <span class="filter-chip active" data-filter="all" onclick="setFilter('all')">Tümü</span>
+        <span class="filter-chip" data-filter="active" onclick="setFilter('active')">Aktif</span>
+        <span class="filter-chip" data-filter="expired" onclick="setFilter('expired')">Dolmuş</span>
+        <span class="filter-chip" data-filter="admin" onclick="setFilter('admin')">Admin</span>
+      </div>
+      <div id="keyList"></div>
+      <button class="btn-red" style="margin-top:14px;" onclick="clearAllKeys()">🗑️ Tümünü temizle</button>
+    </div>
+
+    <span class="logout-link" onclick="doLogout()">Çıkış yap</span>
+  </div>
+
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  // Bu değerler app/google-services.json dosyandaki ile aynı proje.
+  // Bunlar "gizli anahtar" değildir — Firebase web config'i zaten herkese açık olacak
+  // şekilde tasarlanmıştır; asıl güvenlik Firestore Rules + Authentication ile sağlanır.
+  const firebaseConfig = {
+    apiKey: "AIzaSyC9qbhfyLIQbn0JKeHiBNl8CEDoAoX7rdU",
+    authDomain: "walisxphantom.firebaseapp.com",
+    projectId: "walisxphantom",
+    storageBucket: "walisxphantom.firebasestorage.app",
+    messagingSenderId: "691736615503",
+    appId: "1:691736615503:android:fcd93e8d864bcc7500a83a"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  const loginScreen = document.getElementById('loginScreen');
+  const panelScreen = document.getElementById('panelScreen');
+  let allKeys = [];
+  let activeFilter = 'all';
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      loginScreen.style.display = 'none';
+      panelScreen.style.display = 'block';
+      refreshKeyList();
+    } else {
+      loginScreen.style.display = 'block';
+      panelScreen.style.display = 'none';
+    }
+  });
+
+  function doLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPass').value;
+    const errBox = document.getElementById('err');
+    errBox.textContent = '';
+    auth.signInWithEmailAndPassword(email, pass)
+      .catch(e => { errBox.textContent = 'Giriş başarısız: ' + e.message; });
+  }
+
+  function doLogout() { auth.signOut(); }
+
+  function randomKey() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const part = () => Array.from({length:4}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+    return `WP-${part()}-${part()}-${part()}`;
+  }
+
+  function writeKey(days, isAdmin) {
+    const key = randomKey();
+    const expiry = days === -1 ? -1 : Date.now() + days * 24*60*60*1000;
+    db.collection('keys').doc(key).set({
+      expiry: expiry,
+      createdAt: Date.now(),
+      isAdmin: !!isAdmin
+    }).then(() => {
+      document.getElementById('lastKey').textContent = key + (isAdmin ? '  (ADMIN)' : '');
+      refreshKeyList();
+    }).catch(e => alert('Hata: ' + e.message));
+  }
+
+  function generateKey(days, isAdmin) { writeKey(days, isAdmin); }
+
+  function generateCustom() {
+    const gun = parseInt(document.getElementById('ozelGun').value, 10);
+    if (!gun || gun <= 0) { alert('Geçerli bir gün sayısı gir'); return; }
+    writeKey(gun, false);
+  }
+
+  function generateAdminKey() { writeKey(30, true); }
+
+  function setFilter(f) {
+    activeFilter = f;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    renderKeyList();
+  }
+
+  function refreshKeyList() {
+    db.collection('keys').orderBy('createdAt', 'desc').get().then(snap => {
+      allKeys = [];
+      let aktif = 0, dolmus = 0;
+      snap.forEach(doc => {
+        const d = doc.data();
+        const isUnlimited = d.expiry === -1;
+        const isActive = isUnlimited || d.expiry > Date.now();
+        if (isActive) aktif++; else dolmus++;
+        allKeys.push({ id: doc.id, ...d, isUnlimited, isActive });
+      });
+      document.getElementById('statToplam').textContent = allKeys.length;
+      document.getElementById('statAktif').textContent = aktif;
+      document.getElementById('statDolmus').textContent = dolmus;
+      renderKeyList();
+    });
+  }
+
+  function renderKeyList() {
+    const list = document.getElementById('keyList');
+    const q = document.getElementById('searchBox').value.trim().toUpperCase();
+
+    let filtered = allKeys.filter(k => k.id.toUpperCase().includes(q));
+    if (activeFilter === 'active') filtered = filtered.filter(k => k.isActive);
+    if (activeFilter === 'expired') filtered = filtered.filter(k => !k.isActive);
+    if (activeFilter === 'admin') filtered = filtered.filter(k => k.isAdmin);
+
+    list.innerHTML = '';
+    if (filtered.length === 0) {
+      list.innerHTML = '<div class="empty-state">Eşleşen key bulunamadı</div>';
+      return;
+    }
+
+    filtered.forEach(d => {
+      const sureText = d.isUnlimited ? 'SINIRSIZ' : new Date(d.expiry).toLocaleString('tr-TR');
+      const row = document.createElement('div');
+      row.className = 'keyrow';
+      row.innerHTML = `
+        <div>
+          <div class="kid">${d.isAdmin ? '<span class="tag tag-admin">ADMIN</span>' : ''}${d.id}</div>
+          <div class="meta">${sureText}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="tag ${d.isActive ? 'tag-ok' : 'tag-dead'}">${d.isActive ? 'Aktif' : 'Dolmuş'}</span>
+          <button class="small-x" onclick="deleteKey('${d.id}')">Sil</button>
+        </div>`;
+      list.appendChild(row);
+    });
+  }
+
+  function deleteKey(key) {
+    db.collection('keys').doc(key).delete().then(refreshKeyList);
+  }
+
+  function clearAllKeys() {
+    if (!confirm('Tüm key\'ler silinsin mi? Bu işlem geri alınamaz.')) return;
+    db.collection('keys').get().then(snap => {
+      const batch = db.batch();
+      snap.forEach(doc => batch.delete(doc.ref));
+      return batch.commit();
+    }).then(refreshKeyList);
+  }
+</script>
+</body>
+</html>
