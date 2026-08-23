@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kullanım Şartları — MalikYayın</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0710; --card:#171020; --card-line:#2A1F38;
+    --ink:#F5EEFA; --muted:#9C8BAE;
+    --pink:#FF2D78; --purple:#7C3AED; --gold:#FFC24B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Inter',-apple-system,Segoe UI,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.7;
+  }
+  a{ color:var(--gold); }
+  .glow{
+    position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(600px 400px at 15% 0%, rgba(255,45,120,.14), transparent 60%),
+      radial-gradient(700px 500px at 85% 20%, rgba(124,58,237,.16), transparent 60%);
+  }
+  nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(11,7,16,.75); backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--card-line);
+  }
+  .nav-inner{ display:flex; align-items:center; justify-content:space-between; padding:16px 24px; max-width:760px; margin:0 auto; }
+  .logo{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; display:flex; align-items:center; gap:9px; text-decoration:none; }
+  .logo-dot{ width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,var(--pink),var(--purple)); box-shadow:0 0 14px rgba(255,45,120,.7); }
+  .back{ font-size:13px; color:var(--muted); text-decoration:none; }
+
+  .wrap{ max-width:720px; margin:0 auto; padding:48px 24px 80px; }
+  h1{ font-family:'Space Grotesk',sans-serif; font-size:clamp(26px,4vw,34px); margin:0 0 6px; }
+  .updated{ color:var(--muted); font-size:12.5px; margin:0 0 36px; }
+  h2{ font-family:'Space Grotesk',sans-serif; font-size:18px; margin:32px 0 10px; }
+  p, li{ color:#D8CEE3; font-size:14.5px; }
+  ul{ padding-left:20px; margin:10px 0; }
+  li{ margin-bottom:6px; }
+
+  footer{ border-top:1px solid var(--card-line); padding:26px 0; margin-top:40px; }
+  .footer-inner{ max-width:720px; margin:0 auto; padding:0 24px; font-size:12.5px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="glow"></div>
+
+<nav>
+  <div class="nav-inner">
+    <a class="logo" href="/"><span class="logo-dot"></span>MalikYayın</a>
+    <a class="back" href="/">← Ana sayfa</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <h1>Kullanım Şartları</h1>
+  <p class="updated">Son güncelleme: Ağustos 2026</p>
+
+  <p>MalikYayın uygulamasını ("Hizmet") indirerek, KEY satın alarak veya kullanarak aşağıdaki şartları kabul etmiş sayılırsınız.</p>
+
+  <h2>1. Hizmetin tanımı</h2>
+  <p>MalikYayın, TikTok LIVE yayınlarında hediye, beğeni ve takipçi olaylarını gerçek zamanlı olarak ekran üstü (overlay) katmanında gösteren bir Android uygulamasıdır. Hizmet, geçerli bir lisans anahtarı (KEY) ile çalışır.</p>
+
+  <h2>2. Lisans ve KEY kullanımı</h2>
+  <ul>
+    <li>Her KEY, satın alınan süre boyunca (örn. 30 gün) geçerlidir ve tek bir kullanıcı/cihaz için tanımlanmıştır.</li>
+    <li>KEY'in başkasıyla paylaşılması, çoğaltılması veya yeniden satılması yasaktır.</li>
+    <li>Kötüye kullanım tespit edilirse KEY önceden bildirim yapılmaksızın iptal edilebilir.</li>
+  </ul>
+
+  <h2>3. Sorumluluk sınırı</h2>
+  <p>MalikYayın, TikTok'un resmi bir ürünü değildir ve TikTok Inc. ile bağlantılı değildir. TikTok'un canlı yayın altyapısında yapabileceği değişiklikler hizmetin çalışmasını geçici olarak etkileyebilir; bu durumlarda makul sürede güncelleme yapılmaya çalışılır.</p>
+
+  <h2>4. Kullanıcı yükümlülükleri</h2>
+  <ul>
+    <li>Uygulamayı yürürlükteki yasalara ve TikTok'un kullanım şartlarına uygun şekilde kullanmayı kabul edersiniz.</li>
+    <li>Uygulamayı tersine mühendislik yapmak, kaynak kodunu izinsiz kopyalamak veya dağıtmak yasaktır.</li>
+  </ul>
+
+  <h2>5. Değişiklikler</h2>
+  <p>Bu şartlar zaman zaman güncellenebilir. Güncel sürüm her zaman bu sayfada yayınlanır.</p>
+
+  <h2>6. İletişim</h2>
+  <p>Sorularınız için <a href="/iletisim.html">iletişim sayfamızı</a> kullanabilirsiniz.</p>
+</div>
+
+<footer>
+  <div class="footer-inner">© 2026 MalikYayın — TikTok LIVE Hediye Overlay</div>
+</footer>
+
+</body>
+</html>
