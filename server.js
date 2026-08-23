@@ -8,8 +8,12 @@ const nodemailer = require('nodemailer');
 const axios = require('axios');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const STATIC_ROOT = process.env.VERCEL ? path.join(__dirname) : __dirname;
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
+
+// JWT Gizli Anahtar Fallback Güvenliği
+const JWT_SECRET = process.env.JWT_SECRET || process.env.JWT_SECRET_KEY || process.env.SECRET_KEY || 'malik_yayin_default_fallback_secret_key_2026';
 
 // ---------- DB ----------
 // Vercel'de dosya sistemi salt-okunur; yazılabilir yol /tmp
@@ -118,7 +122,7 @@ app.post('/api/auth/send-code', otpLimiter, async (req, res) => {
 
   try {
     await transporter.sendMail({
-      from: process.env.MAIL_FROM,
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
       to: email,
       subject: 'MalikYayın giriş kodun',
       html: otpEmailHtml(displayName, code),
@@ -163,7 +167,7 @@ app.post('/api/auth/verify-code', (req, res) => {
 
   const token = jwt.sign(
     { uid: user.id, email: user.email },
-    process.env.JWT_SECRET,
+    JWT_SECRET,
     { expiresIn: '30d' }
   );
   res.json({
@@ -178,7 +182,7 @@ function auth(req, res, next) {
   const token = h.startsWith('Bearer ') ? h.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Giriş gerekli.' });
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch {
     res.status(401).json({ error: 'Oturum geçersiz, tekrar giriş yap.' });
@@ -193,8 +197,6 @@ app.get('/api/auth/me', auth, (req, res) => {
 
 // ============================================================
 // KEY doğrulama (mobil uygulama için)
-// İlk başarılı girişte süre başlar (activatedAt set edilir).
-// activatedAt yoksa KEY hiç kullanılmamış sayılır → iade mümkün.
 // ============================================================
 app.post('/api/license/check', (req, res) => {
   const { key } = req.body || {};
@@ -216,7 +218,6 @@ app.post('/api/license/check', (req, res) => {
     return res.json({ ok: true, active: false, error: 'KEY iptal edilmiş.', used: !!lic.activatedAt });
   }
 
-  // İlk kullanım: süreyi şimdi başlat
   if (!lic.activatedAt) {
     const days = Number(lic.durationDays || process.env.LICENSE_DURATION_DAYS || 30);
     const activatedAt = Date.now();
@@ -232,7 +233,7 @@ app.post('/api/license/check', (req, res) => {
         },
       })
       .write();
-    // order kaydını da işaretle
+
     if (lic.key) {
       const order = db.get('orders').find({ key: lic.key }).value();
       if (order) {
@@ -275,8 +276,6 @@ app.post('/api/license/check', (req, res) => {
   });
 });
 
-// İade uygunluğu kontrolü (destek / admin)
-// KEY hiç uygulamada girilmemişse ve satın alımdan 24 saat geçmemişse iade edilebilir.
 app.post('/api/license/refund-check', (req, res) => {
   const { key, email } = req.body || {};
   let user = null;
@@ -330,7 +329,7 @@ app.post('/api/payment/paytr/init', auth, async (req, res) => {
 
     const merchant_oid = 'MY' + Date.now() + crypto.randomBytes(2).toString('hex');
     const email = user.email;
-    // Paket seçimi (frontend my_pkg / body)
+
     const allowed = {
       7: 30, 30: 70, 60: 120, 365: 500,
     };
@@ -420,7 +419,7 @@ app.post('/api/payment/paytr/init', auth, async (req, res) => {
 });
 
 // ============================================================
-// 4) PAYTR — callback → KEY üret + APK linkini e-posta ile gönder
+// 4) PAYTR — callback
 // ============================================================
 app.post('/api/payment/paytr/callback', (req, res) => {
   const { merchant_oid, status, total_amount, hash } = req.body;
@@ -443,7 +442,6 @@ app.post('/api/payment/paytr/callback', (req, res) => {
       const key = genLicenseKey();
       const days = Number(order.days || process.env.LICENSE_DURATION_DAYS || 30);
       const purchasedAt = Date.now();
-      // Süre KEY uygulamada ilk girildiğinde başlar (activatedAt / expiresAt o zaman yazılır)
 
       db.get('orders')
         .find({ merchant_oid })
@@ -465,7 +463,7 @@ app.post('/api/payment/paytr/callback', (req, res) => {
 
       transporter
         .sendMail({
-          from: process.env.MAIL_FROM,
+          from: process.env.MAIL_FROM || process.env.SMTP_USER,
           to: order.email,
           subject: 'MalikYayın KEY + APK hazır 🎉',
           html: licenseEmailHtml(key, days),
@@ -479,7 +477,7 @@ app.post('/api/payment/paytr/callback', (req, res) => {
   res.send('OK');
 });
 
-// APK indirme (doğrudan)
+// APK indirme
 app.get('/download/apk', (req, res) => {
   const apkPath = path.join(__dirname, 'MalikYayin.apk');
   res.download(apkPath, 'MalikYayin.apk', (err) => {
@@ -490,7 +488,6 @@ app.get('/download/apk', (req, res) => {
   });
 });
 
-// Yerel / Railway: normal dinle. Vercel: app export edilir (serverless).
 if (!process.env.VERCEL) {
   app.listen(PORT, () =>
     console.log(`MalikYayın backend http://localhost:${PORT} — APK: ${APK_DOWNLOAD_URL}`)
