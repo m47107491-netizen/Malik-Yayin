@@ -70,14 +70,14 @@ function licenseEmailHtml(key, days) {
     <p>Lisans KEY'in hazır. Uygulamayı indir, KEY'i gir, yayına başla.</p>
     <p style="margin:20px 0 6px;font-size:13px;color:#666">Lisans KEY</p>
     <div style="font-size:22px;font-weight:700;letter-spacing:2px;background:#f0f7ff;padding:14px 18px;border-radius:10px;text-align:center">${key}</div>
-    <p style="margin-top:16px">${days} gün boyunca geçerlidir.</p>
+    <p style="margin-top:16px"><b>${days} gün</b> süresi, KEY'i uygulamaya <b>ilk girdiğin anda</b> başlar. Hiç girmezsen satın alımdan sonra 24 saat içinde iade talep edebilirsin.</p>
     <p style="margin:28px 0 8px;font-size:13px;color:#666">Uygulama (APK)</p>
     <a href="${APK_DOWNLOAD_URL}" style="display:inline-block;background:linear-gradient(135deg,#22D3EE,#A78BFA);color:#061018;padding:14px 22px;border-radius:10px;font-weight:700;text-decoration:none">
       MalikYayın APK İndir
     </a>
     <p style="margin-top:18px;font-size:13px;color:#555">
       1) APK'yı indir ve kur<br>
-      2) Uygulamayı aç, KEY'i yaz<br>
+      2) Uygulamayı aç, KEY'i yaz (süre bu anda başlar)<br>
       3) TikTok kullanıcı adını bağla ve overlay'i başlat
     </p>
     <p style="color:#888;font-size:12px;margin-top:32px">MalikYayın — TikTok LIVE Hediye Overlay</p>
@@ -188,6 +188,8 @@ app.get('/api/auth/me', auth, (req, res) => {
 
 // ============================================================
 // KEY doğrulama (mobil uygulama için)
+// İlk başarılı girişte süre başlar (activatedAt set edilir).
+// activatedAt yoksa KEY hiç kullanılmamış sayılır → iade mümkün.
 // ============================================================
 app.post('/api/license/check', (req, res) => {
   const { key } = req.body || {};
@@ -204,23 +206,108 @@ app.post('/api/license/check', (req, res) => {
     return res.json({ ok: false, active: false, error: 'Geçersiz KEY.' });
   }
 
-  const { expiresAt, active } = user.license;
-  const stillValid = active && expiresAt > Date.now();
+  const lic = user.license;
+  if (lic.active === false) {
+    return res.json({ ok: true, active: false, error: 'KEY iptal edilmiş.', used: !!lic.activatedAt });
+  }
+
+  // İlk kullanım: süreyi şimdi başlat
+  if (!lic.activatedAt) {
+    const days = Number(lic.durationDays || process.env.LICENSE_DURATION_DAYS || 30);
+    const activatedAt = Date.now();
+    const expiresAt = activatedAt + days * 24 * 60 * 60 * 1000;
+    db.get('users')
+      .find({ email: user.email })
+      .assign({
+        license: {
+          ...lic,
+          activatedAt,
+          expiresAt,
+          active: true,
+        },
+      })
+      .write();
+    // order kaydını da işaretle
+    if (lic.key) {
+      const order = db.get('orders').find({ key: lic.key }).value();
+      if (order) {
+        db.get('orders').find({ key: lic.key }).assign({ activatedAt, used: true }).write();
+      }
+    }
+    return res.json({
+      ok: true,
+      active: true,
+      firstActivation: true,
+      activatedAt,
+      expiresAt,
+      durationDays: days,
+      email: user.email,
+      name: user.name,
+    });
+  }
+
+  const stillValid = lic.expiresAt && lic.expiresAt > Date.now();
   if (!stillValid) {
     return res.json({
       ok: true,
       active: false,
+      used: true,
       error: 'KEY süresi dolmuş.',
-      expiresAt,
+      expiresAt: lic.expiresAt,
+      activatedAt: lic.activatedAt,
     });
   }
 
   res.json({
     ok: true,
     active: true,
-    expiresAt,
+    used: true,
+    firstActivation: false,
+    activatedAt: lic.activatedAt,
+    expiresAt: lic.expiresAt,
     email: user.email,
     name: user.name,
+  });
+});
+
+// İade uygunluğu kontrolü (destek / admin)
+// KEY hiç uygulamada girilmemişse ve satın alımdan 24 saat geçmemişse iade edilebilir.
+app.post('/api/license/refund-check', (req, res) => {
+  const { key, email } = req.body || {};
+  let user = null;
+  if (key) {
+    const normalized = String(key).trim().toUpperCase();
+    user = db
+      .get('users')
+      .find((u) => u.license && u.license.key && u.license.key.toUpperCase() === normalized)
+      .value();
+  } else if (email) {
+    user = db.get('users').find({ email: String(email).trim().toLowerCase() }).value();
+  }
+  if (!user || !user.license) {
+    return res.json({ ok: false, refundable: false, error: 'KEY veya kullanıcı bulunamadı.' });
+  }
+  const lic = user.license;
+  const used = !!lic.activatedAt;
+  const purchasedAt = lic.purchasedAt || 0;
+  const within24h = Date.now() - purchasedAt <= 24 * 60 * 60 * 1000;
+  const refundable = !used && within24h && lic.active !== false;
+
+  res.json({
+    ok: true,
+    refundable,
+    used,
+    within24h,
+    purchasedAt,
+    activatedAt: lic.activatedAt || null,
+    expiresAt: lic.expiresAt || null,
+    key: lic.key,
+    email: user.email,
+    reason: used
+      ? 'KEY uygulamada aktifleştirilmiş, iade yapılamaz.'
+      : !within24h
+        ? '24 saat dolmuş, iade yapılamaz.'
+        : 'KEY hiç kullanılmamış ve 24 saat içinde — iade uygun.',
   });
 });
 
@@ -340,12 +427,25 @@ app.post('/api/payment/paytr/callback', (req, res) => {
     if (status === 'success') {
       const key = genLicenseKey();
       const days = Number(process.env.LICENSE_DURATION_DAYS || 30);
-      const expiresAt = Date.now() + days * 24 * 60 * 60 * 1000;
+      const purchasedAt = Date.now();
+      // Süre KEY uygulamada ilk girildiğinde başlar (activatedAt / expiresAt o zaman yazılır)
 
-      db.get('orders').find({ merchant_oid }).assign({ status: 'success', key }).write();
+      db.get('orders')
+        .find({ merchant_oid })
+        .assign({ status: 'success', key, purchasedAt, used: false })
+        .write();
       db.get('users')
         .find({ email: order.email })
-        .assign({ license: { key, expiresAt, active: true } })
+        .assign({
+          license: {
+            key,
+            purchasedAt,
+            durationDays: days,
+            activatedAt: null,
+            expiresAt: null,
+            active: true,
+          },
+        })
         .write();
 
       transporter
