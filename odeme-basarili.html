@@ -7,20 +7,39 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{ --bg:#070B14; --card:#111827; --card-line:#1E2A3A; --ink:#E8F0FF; --muted:#8BA3C7; --cyan:#22D3EE; --violet:#A78BFA; --green:#34D399; }
+  :root{
+    --bg:#070B14; --card:#111827; --card-line:#1E2A3A; --ink:#E8F0FF; --muted:#8BA3C7;
+    --cyan:#22D3EE; --violet:#A78BFA; --green:#34D399;
+  }
   *{box-sizing:border-box;}
   body{
     margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif;
     display:flex; align-items:center; justify-content:center; padding:24px;
-    background-image: radial-gradient(500px 350px at 50% 20%, rgba(52,211,153,.12), transparent 55%);
+    background-image: radial-gradient(500px 350px at 50% 15%, rgba(52,211,153,.12), transparent 55%);
   }
-  .card{ max-width:420px; text-align:center; background:var(--card); border:1px solid var(--card-line); border-radius:18px; padding:36px 28px; }
-  .icon{ font-size:42px; margin-bottom:12px; }
+  .card{
+    max-width:440px; width:100%; text-align:center;
+    background:var(--card); border:1px solid var(--card-line); border-radius:18px; padding:36px 28px;
+  }
+  .icon{ font-size:42px; margin-bottom:10px; }
   h1{ font-family:'Space Grotesk',sans-serif; font-size:22px; margin:0 0 10px; color:var(--green); }
-  p{ color:var(--muted); font-size:14.5px; margin:0 0 24px; line-height:1.6; }
-  a{
-    display:inline-block; padding:12px 22px; border-radius:10px; font-weight:600; font-size:14px;
-    background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#061018; text-decoration:none;
+  p{ color:var(--muted); font-size:14.5px; margin:0 0 18px; line-height:1.6; }
+  .steps{
+    text-align:left; background:#0C1524; border-radius:12px; padding:16px 18px;
+    margin:0 0 22px; font-size:13.5px; color:var(--ink);
+  }
+  .steps div{ margin-bottom:8px; }
+  .steps div:last-child{ margin-bottom:0; }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; padding:14px; border-radius:11px; font-weight:700; font-size:14.5px;
+    text-decoration:none; margin-bottom:10px; border:none; cursor:pointer; font-family:inherit;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#061018;
+  }
+  .btn-ghost{
+    background:transparent; border:1px solid var(--card-line); color:var(--ink);
   }
 </style>
 </head>
@@ -28,8 +47,16 @@
 <div class="card">
   <div class="icon">✓</div>
   <h1>Ödeme alındı</h1>
-  <p>Lisans KEY’in kayıtlı e-posta adresine gönderildi. Gelen kutunu (ve spam klasörünü) kontrol et. KEY ile uygulamayı açabilirsin.</p>
-  <a href="index.html">Ana sayfaya dön</a>
+  <p>Lisans <strong style="color:var(--ink)">KEY</strong>’in e-posta adresine gönderildi. Aşağıdan uygulamayı indirip KEY ile giriş yapabilirsin.</p>
+
+  <div class="steps">
+    <div>① E-postandaki <b>KEY</b>’i kopyala</div>
+    <div>② <b>APK</b>’yı indir ve kur</div>
+    <div>③ Uygulamayı aç → KEY’i gir → TikTok bağla</div>
+  </div>
+
+  <a class="btn btn-primary" href="/MalikYayin.apk" download="MalikYayin.apk">⬇ MalikYayın APK İndir</a>
+  <a class="btn btn-ghost" href="index.html">Ana sayfaya dön</a>
 </div>
 </body>
 </html>
