@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ödeme — MalikYayın</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070B14; --card:#111827; --card-line:#1E2A3A; --ink:#E8F0FF; --muted:#8BA3C7;
+    --cyan:#22D3EE; --violet:#A78BFA;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+    background-image:
+      radial-gradient(500px 350px at 20% 10%, rgba(34,211,238,.1), transparent 55%),
+      radial-gradient(500px 350px at 80% 90%, rgba(167,139,250,.1), transparent 55%);
+  }
+  .wrap{ width:100%; max-width:520px; text-align:center; }
+  .logo{
+    display:flex; align-items:center; justify-content:center; gap:9px;
+    font-weight:700; font-size:18px; margin-bottom:20px; font-family:'Space Grotesk',sans-serif;
+  }
+  .logo-dot{ width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,var(--cyan),var(--violet)); }
+  h1{ font-family:'Space Grotesk',sans-serif; font-size:22px; margin:0 0 8px; }
+  p{ color:var(--muted); font-size:14px; margin:0 0 20px; }
+  .pkgs{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .pkg{
+    background:var(--card); border:1px solid var(--card-line); border-radius:14px; padding:16px 12px;
+  }
+  .pkg .name{ font-size:13px; color:var(--muted); }
+  .pkg .price{ font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; margin:6px 0; }
+  .pkg .sub{ font-size:12px; color:var(--muted); margin-bottom:10px; }
+  .pkg a{
+    display:block; width:100%; padding:10px; border-radius:10px; font-weight:700; font-size:13px;
+    background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#061018; text-decoration:none;
+  }
+  .back{ display:inline-block; margin-top:18px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo"><span class="logo-dot"></span>MalikYayın</div>
+  <h1>Lisans paketi seç</h1>
+  <p>Ödeme Shopier üzerinden güvenle alınır. Ödeme sonrası KEY e-posta ile gelir.</p>
+  <div class="pkgs" id="pkgs"></div>
+  <a class="back" href="index.html">← Ana sayfa</a>
+</div>
+<script src="config.js"></script>
+<script>
+  const SHOPIER = window.MALIKYAYIN_SHOPIER || {
+    7: 'https://www.shopier.com/malik__yayin/50221098',
+    30: 'https://www.shopier.com/malik__yayin/50221155',
+    60: 'https://www.shopier.com/malik__yayin/50221214',
+    365: 'https://www.shopier.com/malik__yayin/50221272'
+  };
+  const packages = [
+    { days: 7, price: 30, label: '1 Hafta', sub: '7 gün erişim' },
+    { days: 30, price: 70, label: '1 Ay', sub: '30 gün erişim' },
+    { days: 60, price: 120, label: '2 Ay', sub: '60 gün erişim' },
+    { days: 365, price: 500, label: '1 Yıl', sub: '365 gün erişim' }
+  ];
+  document.getElementById('pkgs').innerHTML = packages.map(p => {
+    const url = SHOPIER[p.days] || '#';
+    return `<div class="pkg">
+      <div class="name">${p.label}</div>
+      <div class="price">₺${p.price}</div>
+      <div class="sub">${p.sub}</div>
+      <a href="${url}" target="_blank" rel="noopener">Satın Al</a>
+    </div>`;
+  }).join('');
+</script>
+</body>
+</html>
