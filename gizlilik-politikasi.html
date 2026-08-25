@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gizlilik Politikası — MalikYayın</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070B14; --card:#111827; --card-line:#1E2A3A;
+    --ink:#E8F0FF; --muted:#8BA3C7;
+    --cyan:#22D3EE; --violet:#A78BFA; --gold:#FBBF24;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',-apple-system,Segoe UI,sans-serif; background:var(--bg); color:var(--ink); line-height:1.7; }
+  a{ color:var(--gold); }
+  .glow{
+    position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(600px 400px at 15% 0%, rgba(34,211,238,.12), transparent 60%),
+      radial-gradient(700px 500px at 85% 20%, rgba(167,139,250,.14), transparent 60%);
+  }
+  nav{ position:sticky; top:0; z-index:50; background:rgba(7,11,20,.78); backdrop-filter:blur(14px); border-bottom:1px solid var(--card-line); }
+  .nav-inner{ display:flex; align-items:center; justify-content:space-between; padding:16px 24px; max-width:760px; margin:0 auto; }
+  .logo{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; display:flex; align-items:center; gap:9px; text-decoration:none; color:var(--ink); }
+  .logo-dot{ width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,var(--cyan),var(--violet)); box-shadow:0 0 14px rgba(34,211,238,.7); }
+  .back{ font-size:13px; color:var(--muted); text-decoration:none; }
+  .wrap{ max-width:720px; margin:0 auto; padding:48px 24px 80px; }
+  h1{ font-family:'Space Grotesk',sans-serif; font-size:clamp(26px,4vw,34px); margin:0 0 6px; }
+  .updated{ color:var(--muted); font-size:12.5px; margin:0 0 36px; }
+  h2{ font-family:'Space Grotesk',sans-serif; font-size:18px; margin:32px 0 10px; }
+  p, li{ color:#C5D4E8; font-size:14.5px; }
+  ul{ padding-left:20px; margin:10px 0; }
+  li{ margin-bottom:6px; }
+  table{ width:100%; border-collapse:collapse; margin:16px 0; font-size:13.5px; }
+  th, td{ text-align:left; padding:10px 12px; border-bottom:1px solid var(--card-line); color:#C5D4E8; }
+  th{ color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  footer{ border-top:1px solid var(--card-line); padding:26px 0; margin-top:40px; }
+  .footer-inner{ max-width:720px; margin:0 auto; padding:0 24px; font-size:12.5px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<nav>
+  <div class="nav-inner">
+    <a class="logo" href="/"><span class="logo-dot"></span>MalikYayın</a>
+    <a class="back" href="/">← Ana sayfa</a>
+  </div>
+</nav>
+<div class="wrap">
+  <h1>Gizlilik Politikası</h1>
+  <p class="updated">Son güncelleme: Ağustos 2026</p>
+  <p>Bu sayfa, MalikYayın uygulamasını ve web sitesini kullanırken hangi verilerin toplandığını ve nasıl kullanıldığını açıklar. 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında bilgilendirme niteliğindedir.</p>
+
+  <h2>1. Toplanan veriler</h2>
+  <table>
+    <tr><th>Veri</th><th>Amaç</th></tr>
+    <tr><td>E-posta adresi</td><td>Hesap oluşturma, giriş kodu gönderimi, KEY teslimi ve destek yazışmaları</td></tr>
+    <tr><td>Ad (isteğe bağlı)</td><td>Kişiselleştirilmiş iletişim ve e-posta şablonları</td></tr>
+    <tr><td>KEY (lisans anahtarı)</td><td>Lisans doğrulaması ve erişim kontrolü</td></tr>
+    <tr><td>TikTok kullanıcı adı</td><td>Canlı yayına bağlanmak için yalnızca uygulama içinde kullanılır</td></tr>
+    <tr><td>Yüklenen görsel/ses dosyaları</td><td>Overlay’de gösterilmek üzere cihazınızda ve/veya bulut depolamada tutulur</td></tr>
+    <tr><td>Ödeme işlem özeti</td><td>Sipariş kaydı (tutar, durum, sipariş no). Kart bilgileri PayTR’de kalır, bizde saklanmaz</td></tr>
+  </table>
+
+  <h2>2. Verilerin saklanması</h2>
+  <p>Hesap, lisans ve sipariş verileri sunucu altyapımızda (JSON/dosya veya eşdeğer güvenli depolama) tutulur. TikTok Live verileri (hediye, beğeni, takipçi bilgileri) yalnızca yayın anında işlenir ve kalıcı olarak saklanmaz. Lisans doğrulaması için Firebase veya benzeri altyapı kullanılabilir.</p>
+
+  <h2>3. Üçüncü taraflarla paylaşım</h2>
+  <p>Verileriniz reklam amacıyla üçüncü taraflarla paylaşılmaz veya satılmaz. Ödeme işlemleri <strong>PayTR</strong> üzerinden yürütülür; ödeme bilgileriniz PayTR’nin kendi gizlilik politikasına tabidir ve MalikYayın tarafından saklanmaz. E-posta gönderimi için SMTP sağlayıcısı kullanılır.</p>
+
+  <h2>4. Çerezler</h2>
+  <p>Web sitemiz, oturum ve temel işlevsellik dışında takip/pazarlama amaçlı çerez kullanmaz.</p>
+
+  <h2>5. Haklarınız</h2>
+  <p>KVKK kapsamında verilerinizin silinmesini, düzeltilmesini veya size ait hangi verilerin tutulduğunu öğrenmeyi talep edebilirsiniz. Bu talepler için <a href="iletisim.html">iletişim sayfamızdan</a> veya <a href="mailto:maliksponsorluk@gmail.com">maliksponsorluk@gmail.com</a> adresinden bize ulaşabilirsiniz.</p>
+
+  <h2>6. Değişiklikler</h2>
+  <p>Bu politika güncellenebilir; güncel sürüm her zaman bu sayfada yer alır.</p>
+</div>
+<footer>
+  <div class="footer-inner">© 2026 MalikYayın — TikTok LIVE Hediye Overlay</div>
+</footer>
+</body>
+</html>
