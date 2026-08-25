@@ -22,7 +22,7 @@
   }
   h1{ font-family:'Space Grotesk',sans-serif; letter-spacing:-0.02em; font-size:22px; margin:0 0 6px; }
   .card{
-    width:100%; max-width:400px; background:var(--card); border:1px solid var(--card-line);
+    width:100%; max-width:440px; background:var(--card); border:1px solid var(--card-line);
     border-radius:20px; padding:28px 26px; margin:24px;
   }
   .logo{ display:flex; align-items:center; gap:9px; font-weight:700; font-size:18px; margin-bottom:18px; font-family:'Space Grotesk',sans-serif; }
@@ -93,6 +93,51 @@
     border:1px solid rgba(248,113,113,.4); background:rgba(248,113,113,.12);
     color:var(--red); font-weight:600; font-size:14px; cursor:pointer; font-family:inherit;
   }
+
+  .acc-status{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 10px; border-radius:100px; font-size:12px; font-weight:600; margin-top:8px;
+  }
+  .acc-status.ok{ background:rgba(52,211,153,.14); color:var(--green); }
+  .acc-status.wait{ background:rgba(251,191,36,.12); color:var(--gold); }
+  .acc-status.none{ background:rgba(139,163,199,.12); color:var(--muted); }
+  .acc-status.fail{ background:rgba(248,113,113,.12); color:var(--red); }
+  .acc-key{
+    margin-top:10px; background:#0A101C; border:1px dashed var(--card-line);
+    border-radius:10px; padding:12px; font-family:'Space Grotesk',sans-serif;
+    font-size:15px; letter-spacing:1px; word-break:break-all; color:var(--ink);
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .acc-key button{
+    flex-shrink:0; border:none; background:rgba(34,211,238,.15); color:var(--cyan);
+    padding:6px 10px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;
+  }
+  .acc-meta{ font-size:12px; color:var(--muted); margin-top:8px; line-height:1.5; }
+  .acc-actions{ display:grid; gap:8px; margin-top:14px; }
+  .btn-ghost2{
+    width:100%; padding:12px; border-radius:10px; font-weight:600; font-size:13.5px;
+    cursor:pointer; font-family:inherit;
+    background:transparent; border:1px solid var(--card-line); color:var(--ink);
+  }
+  .btn-ghost2:hover{ border-color:rgba(34,211,238,.4); }
+  .pkg-mini{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+  .pkg-mini a{
+    display:block; text-align:center; padding:12px 8px; border-radius:12px;
+    background:#0A101C; border:1px solid var(--card-line); text-decoration:none; color:var(--ink);
+  }
+  .pkg-mini a:hover{ border-color:rgba(34,211,238,.45); }
+  .pkg-mini .pl{ font-size:11px; color:var(--muted); }
+  .pkg-mini .pp{ font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; margin-top:2px; }
+  .howto{
+    margin-top:14px; background:#0A101C; border:1px solid var(--card-line);
+    border-radius:12px; padding:12px 14px; font-size:12.5px; color:var(--muted); text-align:left;
+  }
+  .howto b{ color:var(--ink); }
+  .howto div{ margin-bottom:6px; }
+  .howto div:last-child{ margin-bottom:0; }
+  .support-row{ margin-top:12px; font-size:12.5px; color:var(--muted); }
+  .support-row a{ color:var(--cyan); text-decoration:none; font-weight:600; }
+
 </style>
 </head>
 <body>
@@ -222,8 +267,22 @@
     <h1>Hesabım</h1>
     <p class="sub" id="done-msg">Oturumun açık.</p>
     <div id="account-box"></div>
-    <button class="btn" id="buy-btn" type="button" onclick="goToBuy()">KEY Al — ₺70</button>
-    <button class="btn-out" type="button" onclick="logout()">Çıkış Yap</button>
+    <div class="acc-actions">
+      <button class="btn" id="buy-btn" type="button" onclick="goToBuy()">KEY Al</button>
+      <a class="btn-ghost2" href="/MalikYayin.apk" download="MalikYayin.apk" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box">⬇ APK İndir</a>
+      <button class="btn-out" type="button" onclick="logout()">Çıkış Yap</button>
+    </div>
+    <div class="howto" id="howto-box">
+      <div><b>Nasıl kullanılır?</b></div>
+      <div>① APK’yı indirip kur</div>
+      <div>② Uygulamayı aç → KEY’i gir</div>
+      <div>③ TikTok kullanıcı adını bağla → overlay’i başlat</div>
+    </div>
+    <div id="pkg-box" class="pkg-mini"></div>
+    <div class="support-row">
+      Destek: <a href="https://wa.me/905011054830?text=SELAM%20MALIK%20YAYIN" target="_blank" rel="noopener">WhatsApp</a>
+      · <a href="mailto:maliksponsorluk@gmail.com">E-posta</a>
+    </div>
     <a class="back" href="index.html">← Ana sayfa</a>
   </div>
 </div>
@@ -233,7 +292,12 @@
 <script>function onRecaptchaLoad(){ try{ loadCaptcha('login'); }catch(e){} }</script>
 <script>
   const API_BASE = (typeof window.MALIKYAYIN_API_BASE === 'string' ? window.MALIKYAYIN_API_BASE : '').replace(/\/$/, '');
-  const SHOPIER = window.MALIKYAYIN_SHOPIER || {};
+  const SHOPIER = window.MALIKYAYIN_SHOPIER || {
+    7: 'https://www.shopier.com/malik__yayin/50221098',
+    30: 'https://www.shopier.com/malik__yayin/50221155',
+    60: 'https://www.shopier.com/malik__yayin/50221214',
+    365: 'https://www.shopier.com/malik__yayin/50221272'
+  };
 
   function show(step){
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
@@ -362,19 +426,69 @@
     localStorage.setItem('my_user', JSON.stringify(user));
   }
 
+  function fmtDate(ts){
+    if(!ts) return '—';
+    try{ return new Date(ts).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+    catch(e){ return '—'; }
+  }
+
   function fillAccount(user){
     const box = document.getElementById('account-box');
     if(!box || !user) return;
-    let licLine = 'Lisans: yok';
-    if(user.license && user.license.key){
-      const st = user.license.active === false ? 'iptal' : (user.license.activatedAt ? 'aktif' : 'aktifleştirilmedi');
-      licLine = 'KEY: <b style="color:var(--ink)">' + user.license.key + '</b> · ' + st;
+    const lic = user.license || null;
+    let badge = '<span class="acc-status none">Lisans yok</span>';
+    let keyHtml = '';
+    let meta = '';
+    if(lic && lic.key){
+      const expired = lic.expiresAt && lic.expiresAt < Date.now();
+      if(lic.active === false){
+        badge = '<span class="acc-status fail">İptal edilmiş</span>';
+      } else if(expired){
+        badge = '<span class="acc-status fail">Süresi dolmuş</span>';
+      } else if(!lic.activatedAt){
+        badge = '<span class="acc-status wait">Aktifleştirilmedi</span>';
+      } else {
+        badge = '<span class="acc-status ok">Aktif</span>';
+      }
+      keyHtml = '<div class="acc-key"><span id="acc-key-text">' + lic.key + '</span>' +
+        '<button type="button" onclick="copyKey()">Kopyala</button></div>';
+      meta = '<div class="acc-meta">';
+      if(lic.durationDays) meta += 'Süre: <b style="color:var(--ink)">' + lic.durationDays + ' gün</b><br>';
+      if(lic.purchasedAt) meta += 'Satın alma: ' + fmtDate(lic.purchasedAt) + '<br>';
+      if(lic.activatedAt) meta += 'Aktivasyon: ' + fmtDate(lic.activatedAt) + '<br>';
+      if(lic.expiresAt) meta += 'Bitiş: ' + fmtDate(lic.expiresAt);
+      meta += '</div>';
     }
     box.innerHTML =
-      '<div style="margin-bottom:6px"><b style="color:var(--ink)">' + (user.name || '—') + '</b></div>' +
-      '<div style="margin-bottom:6px">' + (user.email || '') + '</div>' +
-      '<div>' + licLine + '</div>';
-    document.getElementById('done-msg').textContent = 'Oturumun açık. İstediğin zaman çıkış yapabilirsin.';
+      '<div style="margin-bottom:4px"><b style="color:var(--ink);font-size:16px">' + (user.name || '—') + '</b></div>' +
+      '<div style="color:var(--muted);font-size:13px;margin-bottom:4px">' + (user.email || '') + '</div>' +
+      badge + keyHtml + meta;
+    document.getElementById('done-msg').textContent = lic && lic.key
+      ? (lic.activatedAt ? 'Lisansın hazır. Uygulamada KEY ile devam et.' : 'KEY hazır. Uygulamaya girince süre başlar.')
+      : 'Henüz lisansın yok. Aşağıdan paket seçebilirsin.';
+
+    // Paket mini grid
+    const pkgBox = document.getElementById('pkg-box');
+    if(pkgBox){
+      const pkgs = [
+        {d:7,p:30,l:'1 Hafta'},
+        {d:30,p:70,l:'1 Ay'},
+        {d:60,p:120,l:'2 Ay'},
+        {d:365,p:500,l:'1 Yıl'}
+      ];
+      pkgBox.innerHTML = pkgs.map(x => {
+        const url = SHOPIER[x.d] || '#';
+        return '<a href="'+url+'" target="_blank" rel="noopener"><div class="pl">'+x.l+'</div><div class="pp">₺'+x.p+'</div></a>';
+      }).join('');
+    }
+  }
+
+  function copyKey(){
+    const el = document.getElementById('acc-key-text');
+    if(!el) return;
+    const k = el.textContent || '';
+    if(!k) return;
+    navigator.clipboard.writeText(k).then(()=>alert('KEY kopyalandı')).catch(()=>prompt('Kopyala:', k));
   }
 
   function applyBuyButton(){
