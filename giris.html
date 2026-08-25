@@ -116,16 +116,14 @@
   .acc-actions{ display:grid; gap:8px; margin-top:14px; }
   .btn-ghost2{
     width:100%; padding:12px; border-radius:10px; font-weight:600; font-size:13.5px;
-    cursor:pointer; font-family:inherit;
-    background:transparent; border:1px solid var(--card-line); color:var(--ink);
+    cursor:pointer; font-family:inherit; text-align:center; text-decoration:none; box-sizing:border-box;
+    background:transparent; border:1px solid var(--card-line); color:var(--ink); display:block;
   }
-  .btn-ghost2:hover{ border-color:rgba(34,211,238,.4); }
   .pkg-mini{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
   .pkg-mini a{
     display:block; text-align:center; padding:12px 8px; border-radius:12px;
     background:#0A101C; border:1px solid var(--card-line); text-decoration:none; color:var(--ink);
   }
-  .pkg-mini a:hover{ border-color:rgba(34,211,238,.45); }
   .pkg-mini .pl{ font-size:11px; color:var(--muted); }
   .pkg-mini .pp{ font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; margin-top:2px; }
   .howto{
@@ -137,10 +135,24 @@
   .howto div:last-child{ margin-bottom:0; }
   .support-row{ margin-top:12px; font-size:12.5px; color:var(--muted); }
   .support-row a{ color:var(--cyan); text-decoration:none; font-weight:600; }
+  /* oturum açıkken login flash engelle */
+  body.authed #step-login,
+  body.authed #step-register,
+  body.authed #step-reset{ display:none!important; }
+  body.authed #step-done{ display:block!important; }
 
 </style>
 </head>
 <body>
+<script>
+(function(){
+  try{
+    if(localStorage.getItem('my_token') && localStorage.getItem('my_user')){
+      document.body.classList.add('authed');
+    }
+  }catch(e){}
+})();
+</script>
 <div class="card">
   <div class="logo"><span class="logo-dot"></span>MalikYayın</div>
 
@@ -269,10 +281,10 @@
     <div id="account-box"></div>
     <div class="acc-actions">
       <button class="btn" id="buy-btn" type="button" onclick="goToBuy()">KEY Al</button>
-      <a class="btn-ghost2" href="/MalikYayin.apk" download="MalikYayin.apk" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box">⬇ APK İndir</a>
+      <a class="btn-ghost2" href="/MalikYayin.apk" download="MalikYayin.apk">⬇ APK İndir</a>
       <button class="btn-out" type="button" onclick="logout()">Çıkış Yap</button>
     </div>
-    <div class="howto" id="howto-box">
+    <div class="howto">
       <div><b>Nasıl kullanılır?</b></div>
       <div>① APK’yı indirip kur</div>
       <div>② Uygulamayı aç → KEY’i gir</div>
@@ -435,21 +447,17 @@
   function fillAccount(user){
     const box = document.getElementById('account-box');
     if(!box || !user) return;
+    document.body.classList.add('authed');
     const lic = user.license || null;
     let badge = '<span class="acc-status none">Lisans yok</span>';
     let keyHtml = '';
     let meta = '';
     if(lic && lic.key){
       const expired = lic.expiresAt && lic.expiresAt < Date.now();
-      if(lic.active === false){
-        badge = '<span class="acc-status fail">İptal edilmiş</span>';
-      } else if(expired){
-        badge = '<span class="acc-status fail">Süresi dolmuş</span>';
-      } else if(!lic.activatedAt){
-        badge = '<span class="acc-status wait">Aktifleştirilmedi</span>';
-      } else {
-        badge = '<span class="acc-status ok">Aktif</span>';
-      }
+      if(lic.active === false) badge = '<span class="acc-status fail">İptal edilmiş</span>';
+      else if(expired) badge = '<span class="acc-status fail">Süresi dolmuş</span>';
+      else if(!lic.activatedAt) badge = '<span class="acc-status wait">Aktifleştirilmedi</span>';
+      else badge = '<span class="acc-status ok">Aktif</span>';
       keyHtml = '<div class="acc-key"><span id="acc-key-text">' + lic.key + '</span>' +
         '<button type="button" onclick="copyKey()">Kopyala</button></div>';
       meta = '<div class="acc-meta">';
@@ -463,21 +471,15 @@
       '<div style="margin-bottom:4px"><b style="color:var(--ink);font-size:16px">' + (user.name || '—') + '</b></div>' +
       '<div style="color:var(--muted);font-size:13px;margin-bottom:4px">' + (user.email || '') + '</div>' +
       badge + keyHtml + meta;
-    document.getElementById('done-msg').textContent = lic && lic.key
+    const dm = document.getElementById('done-msg');
+    if(dm) dm.textContent = lic && lic.key
       ? (lic.activatedAt ? 'Lisansın hazır. Uygulamada KEY ile devam et.' : 'KEY hazır. Uygulamaya girince süre başlar.')
       : 'Henüz lisansın yok. Aşağıdan paket seçebilirsin.';
-
-    // Paket mini grid
     const pkgBox = document.getElementById('pkg-box');
     if(pkgBox){
-      const pkgs = [
-        {d:7,p:30,l:'1 Hafta'},
-        {d:30,p:70,l:'1 Ay'},
-        {d:60,p:120,l:'2 Ay'},
-        {d:365,p:500,l:'1 Yıl'}
-      ];
+      const pkgs = [{d:7,p:30,l:'1 Hafta'},{d:30,p:70,l:'1 Ay'},{d:60,p:120,l:'2 Ay'},{d:365,p:500,l:'1 Yıl'}];
       pkgBox.innerHTML = pkgs.map(x => {
-        const url = SHOPIER[x.d] || '#';
+        const url = (SHOPIER && SHOPIER[x.d]) || '#';
         return '<a href="'+url+'" target="_blank" rel="noopener"><div class="pl">'+x.l+'</div><div class="pp">₺'+x.p+'</div></a>';
       }).join('');
     }
@@ -504,13 +506,14 @@
     let pkg = {};
     try { pkg = JSON.parse(localStorage.getItem('my_pkg') || '{}'); } catch(e) {}
     const days = pkg.days || 30;
-    const url = SHOPIER[days] || SHOPIER[30] || 'https://www.shopier.com/malik__yayin/50221155';
+    const url = (SHOPIER && (SHOPIER[days] || SHOPIER[30])) || 'https://www.shopier.com/malik__yayin/50221155';
     window.open(url, '_blank', 'noopener');
   }
 
   function logout(){
     localStorage.removeItem('my_token');
     localStorage.removeItem('my_user');
+    document.body.classList.remove('authed');
     document.getElementById('account-box').innerHTML = '';
     setMsg('login-msg', 'Çıkış yapıldı.', true);
     showAuth('login');
@@ -666,27 +669,41 @@
   document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
   document.getElementById('reg-pass2').addEventListener('keydown', e => { if(e.key === 'Enter') doRegister(); });
 
-  markFormStart('login');
-  loadCaptcha('login');
-
   (function restore(){
     const token = localStorage.getItem('my_token');
     const raw = localStorage.getItem('my_user');
     if(!token || !raw) return;
     try{
       const user = JSON.parse(raw);
+      document.body.classList.add('authed');
+      show('step-done');
       fillAccount(user);
       applyBuyButton();
-      show('step-done');
       fetch(API_BASE + '/api/auth/me', { headers: { Authorization: 'Bearer ' + token } })
-        .then(r => r.ok ? r.json() : null)
+        .then(r => {
+          if(r.status === 401){
+            localStorage.removeItem('my_token');
+            localStorage.removeItem('my_user');
+            document.body.classList.remove('authed');
+            showAuth('login');
+            return null;
+          }
+          return r.ok ? r.json() : null;
+        })
         .then(data => {
           if(!data) return;
           localStorage.setItem('my_user', JSON.stringify(data));
           fillAccount(data);
         }).catch(() => {});
-    }catch(e){}
+    }catch(e){
+      console.warn('restore', e);
+    }
   })();
+
+  if(!document.body.classList.contains('authed')){
+    markFormStart('login');
+    loadCaptcha('login');
+  }
 </script>
 </body>
 </html>
