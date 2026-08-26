@@ -81,71 +81,167 @@ function writeAppConfig(next) {
   })();
 }
 
+async function fetchRemoteDbRaw(token, gistId, repo, dbPath) {
+  // Gist
+  if (gistId) {
+    const r = await fetch('https://api.github.com/gists/' + gistId, {
+      headers: {
+        Authorization: 'Bearer ' + token,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'MalikYayin',
+      },
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error('Gist GET ' + r.status + ' ' + t.slice(0, 120));
+    }
+    const data = await r.json();
+    const files = data.files || {};
+    // Dosya adı esnek: malikyayin-db.json veya tek dosya
+    let file = files['malikyayin-db.json'] || files[dbPath] || null;
+    if (!file) {
+      const keys = Object.keys(files);
+      if (keys.length === 1) file = files[keys[0]];
+      else {
+        const jsonKey = keys.find((k) => k.endsWith('.json'));
+        if (jsonKey) file = files[jsonKey];
+      }
+    }
+    if (!file) throw new Error('Gist içinde json dosyası yok. Dosya adı: malikyayin-db.json olmalı');
+    if (file.truncated && file.raw_url) {
+      const rr = await fetch(file.raw_url, {
+        headers: { Authorization: 'Bearer ' + token, 'User-Agent': 'MalikYayin' },
+      });
+      if (!rr.ok) throw new Error('Gist raw ' + rr.status);
+      return { content: await rr.text(), fileName: file.filename || 'malikyayin-db.json' };
+    }
+    if (!file.content) throw new Error('Gist dosya içeriği boş');
+    return { content: file.content, fileName: file.filename || 'malikyayin-db.json' };
+  }
+  // Repo
+  if (repo) {
+    const apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + dbPath;
+    const r = await fetch(apiBase + '?ref=' + encodeURIComponent(process.env.GITHUB_BRANCH || 'main'), {
+      headers: {
+        Authorization: 'Bearer ' + token,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'MalikYayin',
+      },
+    });
+    if (!r.ok) throw new Error('Repo GET ' + r.status);
+    const data = await r.json();
+    if (!data.content) throw new Error('Repo dosya boş');
+    return {
+      content: Buffer.from(String(data.content).replace(/\n/g, ''), 'base64').toString('utf8'),
+      sha: data.sha,
+      fileName: dbPath,
+    };
+  }
+  throw new Error('GIST_ID veya GITHUB_REPO yok');
+}
+
+function mergeUsers(remoteUsers, localUsers) {
+  const byEmail = new Map();
+  const add = (u) => {
+    if (!u || !u.email) return;
+    const k = String(u.email).toLowerCase().trim();
+    const prev = byEmail.get(k);
+    if (!prev) {
+      byEmail.set(k, u);
+      return;
+    }
+    // Daha zengin lisansı tut
+    const pLic = prev.license || null;
+    const uLic = u.license || null;
+    let license = pLic;
+    if (!pLic && uLic) license = uLic;
+    else if (pLic && uLic) {
+      const pExp = Number(pLic.expiresAt || 0);
+      const uExp = Number(uLic.expiresAt || 0);
+      const pKey = pLic.key || '';
+      const uKey = uLic.key || '';
+      // Aktif + daha uzun süre / daha yeni satın alma kazanır
+      if (uExp > pExp) license = uLic;
+      else if (uExp === pExp && Number(uLic.purchasedAt || 0) > Number(pLic.purchasedAt || 0)) license = uLic;
+      else if (!pKey && uKey) license = uLic;
+    }
+    byEmail.set(k, Object.assign({}, prev, u, { license, email: k }));
+  };
+  for (const u of remoteUsers || []) add(u);
+  for (const u of localUsers || []) add(u);
+  return Array.from(byEmail.values());
+}
+
+function mergeOrders(remoteOrders, localOrders) {
+  const byOid = new Map();
+  for (const o of remoteOrders || []) {
+    if (o && o.merchant_oid) byOid.set(String(o.merchant_oid), o);
+  }
+  for (const o of localOrders || []) {
+    if (!o || !o.merchant_oid) continue;
+    const k = String(o.merchant_oid);
+    const prev = byOid.get(k);
+    if (!prev) byOid.set(k, o);
+    else if (o.status === 'success' && prev.status !== 'success') byOid.set(k, o);
+    else if ((o.createdAt || 0) > (prev.createdAt || 0) && prev.status !== 'success') byOid.set(k, o);
+  }
+  return Array.from(byOid.values());
+}
+
 async function persistGist() {
   const token = (process.env.GITHUB_TOKEN || '').trim();
   if (!token) {
     console.warn('persistGist: GITHUB_TOKEN yok');
     throw new Error('GITHUB_TOKEN yok');
   }
-
-  let users = db.get('users').value() || [];
-  let orders = db.get('orders').value() || [];
-
-  // GÜVENLIK: Yerel boşsa Gist'teki kullanıcıları ezme
   const gistId = (process.env.GIST_ID || '').trim();
   const repo = (process.env.GITHUB_REPO || '').trim();
-  const path = (process.env.GITHUB_DB_PATH || 'malikyayin-db.json').trim();
+  const dbPath = (process.env.GITHUB_DB_PATH || 'malikyayin-db.json').trim();
+  if (!gistId && !repo) throw new Error('GIST_ID veya GITHUB_REPO tanımlı değil');
 
-  if ((!users || users.length === 0) && (gistId || repo)) {
-    try {
-      let raw = null;
-      if (gistId) {
-        const r = await fetch('https://api.github.com/gists/' + gistId, {
-          headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
-        });
-        if (r.ok) {
-          const data = await r.json();
-          const file = data.files && data.files['malikyayin-db.json'];
-          if (file && file.content) raw = file.content;
-        }
-      } else if (repo) {
-        const apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + path;
-        const r = await fetch(apiBase + '?ref=' + encodeURIComponent(process.env.GITHUB_BRANCH || 'main'), {
-          headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
-        });
-        if (r.ok) {
-          const data = await r.json();
-          if (data.content) raw = Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf8');
-        }
-      }
-      if (raw) {
-        const remote = JSON.parse(raw);
-        if (Array.isArray(remote.users) && remote.users.length > 0) {
-          console.warn('persistGist: yerel users bos, Gist korunuyor (' + remote.users.length + ' kullanici)');
-          users = remote.users;
-          db.set('users', users).write();
-          snapshotToMemory();
-          if ((!orders || orders.length === 0) && Array.isArray(remote.orders) && remote.orders.length) {
-            orders = remote.orders;
-            db.set('orders', orders).write();
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('persistGist koruma okuma:', e.message || e);
-    }
+  let localUsers = db.get('users').value() || [];
+  let localOrders = db.get('orders').value() || [];
+
+  // HER YAZMADAN ÖNCE uzaktan oku ve birleştir — kayıp güncelleme engeli
+  let remoteUsers = [];
+  let remoteOrders = [];
+  let remoteCfg = null;
+  let fileName = 'malikyayin-db.json';
+  try {
+    const remote = await fetchRemoteDbRaw(token, gistId, repo, dbPath);
+    fileName = remote.fileName || fileName;
+    const parsed = JSON.parse(remote.content || '{}');
+    remoteUsers = Array.isArray(parsed.users) ? parsed.users : [];
+    remoteOrders = Array.isArray(parsed.orders) ? parsed.orders : [];
+    if (parsed.appConfig) remoteCfg = parsed.appConfig;
+    console.log('persistGist merge — remote users:', remoteUsers.length, 'local:', localUsers.length);
+  } catch (e) {
+    console.warn('persistGist remote okunamadı (yine de local yazılacak):', e.message || e);
+  }
+
+  const users = mergeUsers(remoteUsers, localUsers);
+  const orders = mergeOrders(remoteOrders, localOrders);
+
+  // Yereli de güncelle ki cold instance yanlış ezmesin
+  db.set('users', users).write();
+  db.set('orders', orders).write();
+  snapshotToMemory();
+
+  if (remoteCfg && !global.__myAppConfig) {
+    global.__myAppConfig = remoteCfg;
+    try { db.set('appConfig', remoteCfg).write(); } catch (_) {}
   }
 
   const payload = {
-    users: users,
-    orders: orders,
+    users,
+    orders,
     appConfig: readAppConfig(),
     otps: [],
     captchas: [],
+    updatedAt: Date.now(),
   };
   const content = JSON.stringify(payload, null, 2);
 
-  // 1) GitHub Gist
   if (gistId) {
     const r = await fetch('https://api.github.com/gists/' + gistId, {
       method: 'PATCH',
@@ -153,128 +249,93 @@ async function persistGist() {
         Authorization: 'Bearer ' + token,
         Accept: 'application/vnd.github+json',
         'Content-Type': 'application/json',
+        'User-Agent': 'MalikYayin',
       },
       body: JSON.stringify({
-        files: { 'malikyayin-db.json': { content } },
+        files: { [fileName]: { content } },
       }),
     });
     if (!r.ok) {
       const txt = await r.text();
-      throw new Error('Gist ' + r.status + ' ' + txt.slice(0, 200));
+      throw new Error('Gist PATCH ' + r.status + ' ' + txt.slice(0, 200));
     }
-    console.log('Gist yazildi — users:', (payload.users || []).length);
+    console.log('Gist yazildi — users:', users.length, 'file:', fileName);
     return true;
   }
 
-  // 2) Repo dosyası (senin yaptığın: malikyayin-db.json)
-  if (repo) {
-    const apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + path;
-    let sha = null;
-    try {
-      const get = await fetch(apiBase, {
-        headers: {
-          Authorization: 'Bearer ' + token,
-          Accept: 'application/vnd.github+json',
-        },
-      });
-      if (get.ok) {
-        const cur = await get.json();
-        sha = cur.sha || null;
-      }
-    } catch (e) {}
-    const body = {
-      message: 'chore: malikyayin db sync',
-      content: Buffer.from(content, 'utf8').toString('base64'),
-      branch: process.env.GITHUB_BRANCH || 'main',
-    };
-    if (sha) body.sha = sha;
-    const r = await fetch(apiBase, {
-      method: 'PUT',
+  // Repo
+  const apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + dbPath;
+  let sha = null;
+  try {
+    const get = await fetch(apiBase, {
       headers: {
         Authorization: 'Bearer ' + token,
         Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json',
+        'User-Agent': 'MalikYayin',
       },
-      body: JSON.stringify(body),
     });
-    if (!r.ok) {
-      const txt = await r.text();
-      throw new Error('Repo DB ' + r.status + ' ' + txt.slice(0, 160));
+    if (get.ok) {
+      const cur = await get.json();
+      sha = cur.sha || null;
     }
-    console.log('Repo DB yazildi — users:', (payload.users || []).length);
-    return true;
+  } catch (e) {}
+  const body = {
+    message: 'chore: malikyayin db sync ' + new Date().toISOString(),
+    content: Buffer.from(content, 'utf8').toString('base64'),
+    branch: process.env.GITHUB_BRANCH || 'main',
+  };
+  if (sha) body.sha = sha;
+  const r = await fetch(apiBase, {
+    method: 'PUT',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'MalikYayin',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error('Repo DB ' + r.status + ' ' + txt.slice(0, 160));
   }
-
-  throw new Error('GIST_ID veya GITHUB_REPO tanımlı değil');
+  console.log('Repo DB yazildi — users:', users.length);
+  return true;
 }
 
 async function loadGistOnBoot() {
   const token = (process.env.GITHUB_TOKEN || '').trim();
-  if (!token) return;
+  if (!token) {
+    console.warn('loadGistOnBoot: GITHUB_TOKEN yok');
+    return;
+  }
   const gistId = (process.env.GIST_ID || '').trim();
   const repo = (process.env.GITHUB_REPO || '').trim();
-  const path = (process.env.GITHUB_DB_PATH || 'malikyayin-db.json').trim();
+  const dbPath = (process.env.GITHUB_DB_PATH || 'malikyayin-db.json').trim();
+  if (!gistId && !repo) {
+    console.warn('loadGistOnBoot: GIST_ID/GITHUB_REPO yok');
+    return;
+  }
   try {
-    let raw = null;
-    if (gistId) {
-      const r = await fetch('https://api.github.com/gists/' + gistId, {
-        headers: {
-          Authorization: 'Bearer ' + token,
-          Accept: 'application/vnd.github+json',
-        },
-      });
-      if (!r.ok) return;
-      const data = await r.json();
-      const file = (data.files && data.files['malikyayin-db.json']) || null;
-      if (file && file.content) raw = file.content;
-    } else if (repo) {
-      const apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + path;
-      const r = await fetch(apiBase + '?ref=' + encodeURIComponent(process.env.GITHUB_BRANCH || 'main'), {
-        headers: {
-          Authorization: 'Bearer ' + token,
-          Accept: 'application/vnd.github+json',
-        },
-      });
-      if (!r.ok) return;
-      const data = await r.json();
-      if (data.content) {
-        raw = Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf8');
-      }
-    }
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (parsed.users && Array.isArray(parsed.users)) {
-      const local = db.get('users').value() || [];
-      const byEmail = new Map();
-      for (const u of parsed.users) {
-        if (u && u.email) byEmail.set(String(u.email).toLowerCase(), u);
-      }
-      for (const u of local) {
-        if (!u || !u.email) continue;
-        const k = String(u.email).toLowerCase();
-        const g = byEmail.get(k);
-        if (!g) { byEmail.set(k, u); continue; }
-        const gLic = g.license && g.license.key;
-        const lLic = u.license && u.license.key;
-        if (!gLic && lLic) byEmail.set(k, Object.assign({}, g, u, { license: u.license }));
-        else if (gLic && lLic) {
-          const gExp = Number((g.license && g.license.expiresAt) || 0);
-          const lExp = Number((u.license && u.license.expiresAt) || 0);
-          if (lExp > gExp) byEmail.set(k, Object.assign({}, g, u, { license: u.license }));
-        }
-      }
-      db.set('users', Array.from(byEmail.values())).write();
-    }
-    if (parsed.orders) db.set('orders', parsed.orders).write();
+    const remote = await fetchRemoteDbRaw(token, gistId, repo, dbPath);
+    const parsed = JSON.parse(remote.content || '{}');
+    const localUsers = db.get('users').value() || [];
+    const localOrders = db.get('orders').value() || [];
+    const users = mergeUsers(parsed.users || [], localUsers);
+    const orders = mergeOrders(parsed.orders || [], localOrders);
+    db.set('users', users).write();
+    db.set('orders', orders).write();
     if (parsed.appConfig) {
       global.__myAppConfig = parsed.appConfig;
       db.set('appConfig', parsed.appConfig).write();
     }
-    console.log('Kalici DB yuklendi — users:', (db.get('users').value() || []).length);
+    snapshotToMemory();
+    console.log('Kalici DB yuklendi — users:', users.length, 'orders:', orders.length);
   } catch (e) {
-    console.warn('Kalici DB yuklenemedi:', e.message);
+    console.warn('Kalici DB yuklenemedi:', e.message || e);
   }
 }
+
 // ---------- Kalıcı bellek + ilk yükleme kilidi ----------
 global.__myUsers = global.__myUsers || null;      // [{...}]
 global.__myOrders = global.__myOrders || null;
@@ -297,19 +358,20 @@ function snapshotToMemory() {
 /** Her istekten önce: Gist/Repo yükle (kısa TTL — admin grant hemen görünsün) */
 async function ensureDb(force) {
   const now = Date.now();
-  const ttl = 8000; // 8 sn
+  const ttl = 15000; // 15 sn cache
+  const memOk = Array.isArray(global.__myUsers) && global.__myUsers.length > 0;
   if (
     !force &&
-    Array.isArray(global.__myUsers) &&
-    global.__myUsers.length &&
+    memOk &&
     global.__myDbLoadedAt &&
     now - global.__myDbLoadedAt < ttl
   ) {
     hydrateFromMemory();
     return;
   }
+  // Paralel isteklerde tek yükleme
   if (!global.__myDbReady || force) {
-    global.__myDbReady = (async () => {
+    const run = (async () => {
       await loadGistOnBoot();
       snapshotToMemory();
       global.__myDbLoadedAt = Date.now();
@@ -320,9 +382,19 @@ async function ensureDb(force) {
       snapshotToMemory();
       global.__myDbLoadedAt = Date.now();
     });
+    global.__myDbReady = run;
   }
   await global.__myDbReady;
   hydrateFromMemory();
+  // Hâlâ boşsa bir kez daha zorla dene
+  if ((!global.__myUsers || !global.__myUsers.length) && !force) {
+    try {
+      await loadGistOnBoot();
+      snapshotToMemory();
+      global.__myDbLoadedAt = Date.now();
+    } catch (_) {}
+    hydrateFromMemory();
+  }
 }
 
 /** Kullanıcı/sipariş yazdıktan sonra çağır — disk + bellek + Gist */
@@ -1395,6 +1467,43 @@ app.post('/api/admin/app/update', adminAuth, (req, res) => {
 
 app.get('/api/admin/app/update', adminAuth, (req, res) => {
   res.json({ ok: true, appConfig: readAppConfig() });
+});
+
+
+app.get('/api/admin/db-status', adminAuth, async (req, res) => {
+  const token = !!(process.env.GITHUB_TOKEN || '').trim();
+  const gistId = (process.env.GIST_ID || '').trim();
+  const repo = (process.env.GITHUB_REPO || '').trim();
+  const out = {
+    ok: true,
+    hasToken: token,
+    hasGistId: !!gistId,
+    hasRepo: !!repo,
+    memUsers: Array.isArray(global.__myUsers) ? global.__myUsers.length : 0,
+    diskUsers: (db.get('users').value() || []).length,
+    gistUsers: null,
+    gistError: null,
+    gistFile: null,
+  };
+  if (token && (gistId || repo)) {
+    try {
+      const remote = await fetchRemoteDbRaw(
+        (process.env.GITHUB_TOKEN || '').trim(),
+        gistId,
+        repo,
+        (process.env.GITHUB_DB_PATH || 'malikyayin-db.json').trim()
+      );
+      out.gistFile = remote.fileName;
+      const parsed = JSON.parse(remote.content || '{}');
+      out.gistUsers = Array.isArray(parsed.users) ? parsed.users.length : 0;
+      out.gistUpdatedAt = parsed.updatedAt || null;
+    } catch (e) {
+      out.gistError = String(e.message || e);
+    }
+  } else {
+    out.gistError = 'GITHUB_TOKEN veya GIST_ID/GITHUB_REPO eksik';
+  }
+  res.json(out);
 });
 
 app.get('/api/admin/stats', adminAuth, (req, res) => {

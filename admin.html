@@ -111,7 +111,7 @@ code{background:#0A101C;padding:3px 7px;border-radius:6px;font-size:11.5px;borde
         <button class="btn btn-ghost btn-sm" type="button" onclick="goPage('site')">Site</button>
       </div>
       <section id="page-dash">
-        <div class="topbar"><div><h1>Kontrol paneli</h1><p class="muted" style="margin:4px 0 0">MalikYayin site + lisans ozeti</p></div><span class="status-pill off" id="paytr-chip">PayTR: ...</span></div>
+        <div class="topbar"><div><h1>Kontrol paneli</h1><p class="muted" style="margin:4px 0 0">MalikYayin site + lisans ozeti</p></div></div>
         <div class="stats" id="stats"></div>
         <div class="grid-2">
           <div class="panel"><div class="panel-h"><h2>Son kullanicilar</h2></div><div class="panel-b" style="padding:0;overflow-x:auto"><table><thead><tr><th>Ad</th><th>E-posta</th><th>KEY</th></tr></thead><tbody id="dash-users"></tbody></table></div></div>
@@ -124,7 +124,7 @@ code{background:#0A101C;padding:3px 7px;border-radius:6px;font-size:11.5px;borde
         <div class="panel" style="overflow-x:auto"><table><thead><tr><th>Kullanici</th><th>KEY / Sure</th><th>Durum</th><th>Islemler</th></tr></thead><tbody id="users-body"></tbody></table></div>
       </section>
       <section id="page-orders" class="hidden">
-        <div class="topbar"><div><h1>Siparisler</h1><p class="muted" style="margin:4px 0 0">PayTR odemeleri</p></div></div>
+        <div class="topbar"><div><h1>Siparisler</h1><p class="muted" style="margin:4px 0 0">Shopier / siparis kayitlari</p></div></div>
         <div class="toolbar"><select id="order-filter" onchange="renderOrders()" style="margin:0;max-width:180px"><option value="all">Tumu</option><option value="success">Basarili</option><option value="pending">Bekleyen</option><option value="failed">Basarisiz</option></select></div>
         <div class="panel" style="overflow-x:auto"><table><thead><tr><th>Siparis no</th><th>E-posta</th><th>Paket</th><th>Durum</th><th>KEY</th></tr></thead><tbody id="orders-body"></tbody></table></div>
       </section>
@@ -157,7 +157,7 @@ code{background:#0A101C;padding:3px 7px;border-radius:6px;font-size:11.5px;borde
           <a class="link-card" href="iletisim.html" target="_blank">Iletisim<span>iletisim.html</span></a>
         </div></div></div>
         <div class="panel"><div class="panel-h"><h2>Zorunlu guncelleme (APK)</h2></div><div class="panel-b">
-            <p class="muted" style="margin:0 0 12px">Acikken uygulama acilista kilit ekrani gosterir. Buton siteye yonlendirir. Surum yok. Not: Vercel veriyi unutabilir; kalici icin GIST_ID + GITHUB_TOKEN ekle (asagida anlatildi).</p>
+            <p class="muted" style="margin:0 0 12px">Acikken uygulama acilista kilit ekrani gosterir. Buton siteye yonlendirir. Surum yok. Kalici veri icin Vercel Environment Variables: GITHUB_TOKEN + GIST_ID zorunlu. Yoksa ~10 dk sonra KEY/kullanicilar silinir.</p>
             <label>Mesaj</label>
             <input id="upd-message" type="text" placeholder="Uygulama guncellendi...">
             <label>Kirmizi uyari</label>
@@ -223,18 +223,29 @@ function renderOrders(){
 function renderDash(){
   const s=lastStats||{};
   document.getElementById('stats').innerHTML=`<div class="stat"><div class="n">${s.users||0}</div><div class="l">Kullanici</div></div><div class="stat"><div class="n">${s.activeLicenses||0}</div><div class="l">Aktif KEY</div></div><div class="stat"><div class="n">${s.unusedKeys||0}</div><div class="l">Kullanilmamis KEY</div></div><div class="stat"><div class="n">${s.expiredKeys||0}</div><div class="l">Suresi dolmus</div></div><div class="stat"><div class="n">${s.successOrders||0}</div><div class="l">Basarili siparis</div></div><div class="stat"><div class="n">${s.pendingOrders||0}</div><div class="l">Bekleyen</div></div><div class="stat"><div class="n">₺${Number(s.revenueTry||0).toFixed(0)}</div><div class="l">Toplam gelir</div></div><div class="stat"><div class="n">${s.newUsers24h||0}</div><div class="l">Yeni (24s)</div></div>`;
-  const chip=document.getElementById('paytr-chip');if(s.paytrReady){chip.textContent='PayTR: Acik';chip.className='status-pill on'}else{chip.textContent='PayTR: Kapali (Yakinda)';chip.className='status-pill off'}
   document.getElementById('dash-users').innerHTML=(allUsers.slice(0,8)).map(u=>`<tr><td>${escapeHtml(u.name||'—')}</td><td class="muted">${escapeHtml(u.email)}</td><td>${licStatus(u.license).html}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">Yok</td></tr>';
   document.getElementById('dash-orders').innerHTML=(allOrders.slice(0,8)).map(o=>{let b='<span class="badge wait">pending</span>';if(o.status==='success')b='<span class="badge ok">success</span>';if(o.status==='failed')b='<span class="badge fail">failed</span>';return `<tr><td><code>${escapeHtml((o.merchant_oid||'').slice(0,14))}</code></td><td>${b}</td><td>₺${o.priceTry!=null?o.priceTry:'?'}</td></tr>`}).join('')||'<tr><td colspan="3" class="empty">Yok</td></tr>';
   const pkgs=s.packages||{7:30,30:70,60:120,365:500};
   document.getElementById('pkg-list').innerHTML=Object.entries(pkgs).map(([d,p])=>`<div class="pkg-item"><div class="d">${d} gun</div><div class="p">₺${p}</div></div>`).join('');
-  document.getElementById('sys-status').innerHTML=`<p><span class="status-pill ${s.paytrReady?'on':'off'}">${s.paytrReady?'Odeme acik':'Odeme kapali - Yakinda'}</span></p><p class="muted" style="margin-top:12px">Toplam siparis: <b style="color:var(--ink)">${s.orders||0}</b> · Basarisiz: <b style="color:var(--ink)">${s.failedOrders||0}</b> · Son 24s siparis: <b style="color:var(--ink)">${s.orders24h||0}</b></p><p class="muted">Admin: <b style="color:var(--ink)">${escapeHtml(localStorage.getItem('my_admin_email')||'')}</b></p>`;
+  const db=s.dbStatus||{};
+  let dbLine='Kalici DB: ';
+  if(db.gistError){dbLine+='<b style="color:#F87171">HATA — '+escapeHtml(db.gistError)+'</b>';}
+  else if(db.gistUsers!=null){dbLine+='<b style="color:#34D399">Gist OK</b> · Gist kullanici: <b style="color:var(--ink)">'+db.gistUsers+'</b> · Bellek: <b style="color:var(--ink)">'+(db.memUsers||0)+'</b>'+(db.gistFile?' · dosya: '+escapeHtml(db.gistFile):'');}
+  else{dbLine+='<b style="color:var(--ink)">'+(s.persistOk?'env var var, kontrol ediliyor...':'TOKEN/GIST_ID eksik')+'</b>';}
+  document.getElementById('sys-status').innerHTML=`<p class="muted">Toplam siparis: <b style="color:var(--ink)">${s.orders||0}</b> · Basarisiz: <b style="color:var(--ink)">${s.failedOrders||0}</b> · Son 24s: <b style="color:var(--ink)">${s.orders24h||0}</b></p><p class="muted" style="margin-top:8px">${dbLine}</p><p class="muted">Admin: <b style="color:var(--ink)">${escapeHtml(localStorage.getItem('my_admin_email')||'')}</b></p>`;
 }
 async function refresh(){
   if(!token()){logout();return}
-  try{const [sRes,uRes,oRes]=await Promise.all([fetch(API_BASE+'/api/admin/stats',{headers:authHeaders()}),fetch(API_BASE+'/api/admin/users',{headers:authHeaders()}),fetch(API_BASE+'/api/admin/orders',{headers:authHeaders()})]);
+  try{const [sRes,uRes,oRes,dRes]=await Promise.all([
+    fetch(API_BASE+'/api/admin/stats',{headers:authHeaders()}),
+    fetch(API_BASE+'/api/admin/users',{headers:authHeaders()}),
+    fetch(API_BASE+'/api/admin/orders',{headers:authHeaders()}),
+    fetch(API_BASE+'/api/admin/db-status',{headers:authHeaders()})
+  ]);
   if(sRes.status===401||uRes.status===401){logout();return}
   lastStats=await sRes.json();const u=await uRes.json();const o=await oRes.json();
+  const dbSt=dRes.ok?await dRes.json().catch(()=>({})):{};
+  lastStats.dbStatus=dbSt;
   if(lastStats.error){logout();return}allUsers=u.users||[];allOrders=o.orders||[];renderDash();filterUsers();renderOrders();loadForceUpdate()}
   catch(e){alert('Veri yuklenemedi: '+(e.message||e))}
 }
@@ -242,7 +253,7 @@ async function revoke(email){if(!confirm(email+' lisansini iptal et?'))return;co
 async function reactivate(email){const r=await fetch(API_BASE+'/api/admin/license/reactivate',{method:'POST',headers:authHeaders(),body:JSON.stringify({email})});const d=await r.json().catch(()=>({}));if(!r.ok){alert(d.error||'Hata');return}refresh()}
 async function quickExtend(email){const r=await fetch(API_BASE+'/api/admin/license/extend',{method:'POST',headers:authHeaders(),body:JSON.stringify({email,days:30})});const d=await r.json().catch(()=>({}));if(!r.ok){alert(d.error||'Hata');return}alert(d.message||'Uzatildi');refresh()}
 async function deleteUser(email){if(!confirm(email+' hesabini kalici sil?'))return;const r=await fetch(API_BASE+'/api/admin/user/delete',{method:'POST',headers:authHeaders(),body:JSON.stringify({email})});const d=await r.json().catch(()=>({}));if(!r.ok){alert(d.error||'Hata');return}refresh()}
-async function grantKey(){const email=document.getElementById('grant-email').value.trim(),days=Number(document.getElementById('grant-days').value),msg=document.getElementById('grant-msg');msg.className='msg';msg.textContent='';if(!email){msg.className='msg err';msg.textContent='E-posta yaz.';return}const r=await fetch(API_BASE+'/api/admin/license/grant',{method:'POST',headers:authHeaders(),body:JSON.stringify({email,days})});const d=await r.json().catch(()=>({}));if(!r.ok){msg.className='msg err';msg.textContent=d.error||'Hata';return}msg.className='msg ok';msg.innerHTML='KEY: <code style="cursor:pointer" onclick="copyText(\''+d.key+'\')">'+d.key+'</code>';document.getElementById('grant-email').value='';refresh()}
+async function grantKey(){const email=document.getElementById('grant-email').value.trim(),days=Number(document.getElementById('grant-days').value),msg=document.getElementById('grant-msg');msg.className='msg';msg.textContent='';if(!email){msg.className='msg err';msg.textContent='E-posta yaz.';return}const r=await fetch(API_BASE+'/api/admin/license/grant',{method:'POST',headers:authHeaders(),body:JSON.stringify({email,days})});const d=await r.json().catch(()=>({}));if(!r.ok){msg.className='msg err';msg.textContent=d.error||'Hata';return}msg.className='msg ok';msg.innerHTML='KEY: <code style="cursor:pointer" onclick="copyText(\''+d.key+'\')">'+d.key+'</code>'+(d.persisted===false?' <span style="color:#F87171"> (Gist yazilamadi — TOKEN/GIST_ID kontrol et!)</span>':'');document.getElementById('grant-email').value='';refresh()}
 async function extendKey(){const email=document.getElementById('ext-email').value.trim(),days=Number(document.getElementById('ext-days').value),msg=document.getElementById('ext-msg');msg.className='msg';msg.textContent='';if(!email){msg.className='msg err';msg.textContent='E-posta yaz.';return}const r=await fetch(API_BASE+'/api/admin/license/extend',{method:'POST',headers:authHeaders(),body:JSON.stringify({email,days})});const d=await r.json().catch(()=>({}));if(!r.ok){msg.className='msg err';msg.textContent=d.error||'Hata';return}msg.className='msg ok';msg.textContent=d.message||'Uzatildi';refresh()}
 
 document.getElementById('pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
