@@ -10,15 +10,15 @@
 <style>
   :root{
     --bg:#070B14; --card:#111827; --card-line:#1E2A3A; --ink:#E8F0FF; --muted:#8BA3C7;
-    --cyan:#22D3EE; --violet:#A78BFA; --gold:#FBBF24; --green:#34D399; --red:#F87171;
+    --cyan:#FF6B4A; --violet:#FFB020; --gold:#FBBF24; --green:#34D399; --red:#F87171;
   }
   *{box-sizing:border-box;}
   body{
     margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
     font-family:'Inter',sans-serif; background:var(--bg); color:var(--ink);
     background-image:
-      radial-gradient(600px 400px at 15% 8%, rgba(34,211,238,.14), transparent 60%),
-      radial-gradient(700px 500px at 85% 25%, rgba(167,139,250,.14), transparent 60%);
+      radial-gradient(600px 400px at 15% 8%, rgba(255,107,74,.14), transparent 60%),
+      radial-gradient(700px 500px at 85% 25%, rgba(255,176,32,.14), transparent 60%);
   }
   h1{ font-family:'Space Grotesk',sans-serif; letter-spacing:-0.02em; font-size:22px; margin:0 0 6px; }
   .card{
@@ -26,7 +26,7 @@
     border-radius:20px; padding:28px 26px; margin:24px;
   }
   .logo{ display:flex; align-items:center; gap:9px; font-weight:700; font-size:18px; margin-bottom:18px; font-family:'Space Grotesk',sans-serif; }
-  .logo-dot{ width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,var(--cyan),var(--violet)); box-shadow:0 0 14px rgba(34,211,238,.7); }
+  .logo-dot{ width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,var(--cyan),var(--violet)); box-shadow:0 0 14px rgba(255,107,74,.7); }
   .sub{ color:var(--muted); font-size:13.5px; margin:0 0 18px; }
   .tabs{ display:flex; gap:6px; margin-bottom:18px; background:#0A101C; padding:4px; border-radius:12px; border:1px solid var(--card-line); }
   .tabs button{
@@ -34,7 +34,7 @@
     color:var(--muted); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;
   }
   .tabs button.active{
-    background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#061018;
+    background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#1A0A06;
   }
   label{ display:block; font-size:12.5px; color:var(--muted); margin-bottom:6px; font-weight:600; }
   input{
@@ -46,7 +46,7 @@
   .btn{
     width:100%; padding:14px; border:none; border-radius:10px; font-weight:700; font-size:14.5px;
     cursor:pointer; font-family:inherit;
-    background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#061018;
+    background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#1A0A06;
   }
   .btn:disabled{ opacity:.55; cursor:not-allowed; }
   .link{
@@ -109,7 +109,7 @@
     display:flex; align-items:center; justify-content:space-between; gap:8px;
   }
   .acc-key button{
-    flex-shrink:0; border:none; background:rgba(34,211,238,.15); color:var(--cyan);
+    flex-shrink:0; border:none; background:rgba(255,107,74,.15); color:var(--cyan);
     padding:6px 10px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;
   }
   .acc-meta{ font-size:12px; color:var(--muted); margin-top:8px; line-height:1.5; }
@@ -583,7 +583,12 @@
       document.getElementById('reg-phase-form').style.display = 'none';
       document.getElementById('reg-phase-code').style.display = 'block';
       document.getElementById('reg-code').value = '';
-      setMsg('reg-code-msg', 'Kod gönderildi. E-postanı (ve Spam klasörünü) kontrol et.', true);
+      if (data.devCode) {
+        document.getElementById('reg-code').value = data.devCode;
+        setMsg('reg-code-msg', 'Kod (test): ' + data.devCode + ' — e-posta da kontrol et.', true);
+      } else {
+        setMsg('reg-code-msg', 'Kod gönderildi. E-postanı ve Spam klasörünü kontrol et.', true);
+      }
     }catch(e){
       setMsg('reg-msg', e.message === 'Failed to fetch' ? 'Sunucuya bağlanılamadı.' : e.message);
       loadCaptcha('reg');
