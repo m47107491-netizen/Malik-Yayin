@@ -76,7 +76,10 @@ function writeAppConfig(next) {
 
 async function persistGist() {
   const token = (process.env.GITHUB_TOKEN || '').trim();
-  if (!token) return;
+  if (!token) {
+    console.warn('persistGist: GITHUB_TOKEN yok');
+    throw new Error('GITHUB_TOKEN yok');
+  }
   const payload = {
     users: db.get('users').value() || [],
     orders: db.get('orders').value() || [],
@@ -104,9 +107,10 @@ async function persistGist() {
     });
     if (!r.ok) {
       const txt = await r.text();
-      throw new Error('Gist ' + r.status + ' ' + txt.slice(0, 120));
+      throw new Error('Gist ' + r.status + ' ' + txt.slice(0, 200));
     }
-    return;
+    console.log('Gist yazildi — users:', (payload.users || []).length);
+    return true;
   }
 
   // 2) Repo dosyası (senin yaptığın: malikyayin-db.json)
@@ -144,7 +148,11 @@ async function persistGist() {
       const txt = await r.text();
       throw new Error('Repo DB ' + r.status + ' ' + txt.slice(0, 160));
     }
+    console.log('Repo DB yazildi — users:', (payload.users || []).length);
+    return true;
   }
+
+  throw new Error('GIST_ID veya GITHUB_REPO tanımlı değil');
 }
 
 async function loadGistOnBoot() {
@@ -182,13 +190,34 @@ async function loadGistOnBoot() {
     }
     if (!raw) return;
     const parsed = JSON.parse(raw);
-    if (parsed.users) db.set('users', parsed.users).write();
+    if (parsed.users && Array.isArray(parsed.users)) {
+      const local = db.get('users').value() || [];
+      const byEmail = new Map();
+      for (const u of parsed.users) {
+        if (u && u.email) byEmail.set(String(u.email).toLowerCase(), u);
+      }
+      for (const u of local) {
+        if (!u || !u.email) continue;
+        const k = String(u.email).toLowerCase();
+        const g = byEmail.get(k);
+        if (!g) { byEmail.set(k, u); continue; }
+        const gLic = g.license && g.license.key;
+        const lLic = u.license && u.license.key;
+        if (!gLic && lLic) byEmail.set(k, Object.assign({}, g, u, { license: u.license }));
+        else if (gLic && lLic) {
+          const gExp = Number((g.license && g.license.expiresAt) || 0);
+          const lExp = Number((u.license && u.license.expiresAt) || 0);
+          if (lExp > gExp) byEmail.set(k, Object.assign({}, g, u, { license: u.license }));
+        }
+      }
+      db.set('users', Array.from(byEmail.values())).write();
+    }
     if (parsed.orders) db.set('orders', parsed.orders).write();
     if (parsed.appConfig) {
       global.__myAppConfig = parsed.appConfig;
       db.set('appConfig', parsed.appConfig).write();
     }
-    console.log('Kalici DB yuklendi — users:', (parsed.users || []).length);
+    console.log('Kalici DB yuklendi — users:', (db.get('users').value() || []).length);
   } catch (e) {
     console.warn('Kalici DB yuklenemedi:', e.message);
   }
@@ -212,22 +241,31 @@ function snapshotToMemory() {
   global.__myOrders = db.get('orders').value() || [];
 }
 
-/** Her istekten önce: Gist/Repo'dan bir kez yükle, belleğe al */
-async function ensureDb() {
-  // Önce warm memory varsa diske yaz
-  if (Array.isArray(global.__myUsers) && global.__myUsers.length) {
+/** Her istekten önce: Gist/Repo yükle (kısa TTL — admin grant hemen görünsün) */
+async function ensureDb(force) {
+  const now = Date.now();
+  const ttl = 8000; // 8 sn
+  if (
+    !force &&
+    Array.isArray(global.__myUsers) &&
+    global.__myUsers.length &&
+    global.__myDbLoadedAt &&
+    now - global.__myDbLoadedAt < ttl
+  ) {
     hydrateFromMemory();
     return;
   }
-  if (!global.__myDbReady) {
+  if (!global.__myDbReady || force) {
     global.__myDbReady = (async () => {
       await loadGistOnBoot();
       snapshotToMemory();
+      global.__myDbLoadedAt = Date.now();
       console.log('ensureDb hazır — users:', (global.__myUsers || []).length);
     })().catch((e) => {
       console.warn('ensureDb hata:', e.message);
       global.__myDbReady = null;
       snapshotToMemory();
+      global.__myDbLoadedAt = Date.now();
     });
   }
   await global.__myDbReady;
@@ -237,10 +275,14 @@ async function ensureDb() {
 /** Kullanıcı/sipariş yazdıktan sonra çağır — disk + bellek + Gist */
 async function saveDb() {
   snapshotToMemory();
+  global.__myDbLoadedAt = Date.now();
   try {
     await persistGist();
+    console.log('saveDb OK — users:', (global.__myUsers || []).length);
+    return true;
   } catch (e) {
-    console.warn('saveDb persist:', e.message || e);
+    console.error('saveDb HATA (Gist/Repo yazılamadı):', e.message || e);
+    return false;
   }
 }
 
@@ -1104,18 +1146,22 @@ function adminAuth(req, res, next) {
 }
 
 app.get('/api/auth/me', auth, async (req, res) => {
-  await ensureDb();
-  let user = db.get('users').find({ email: req.user.email }).value();
+  try { await ensureDb(true); } catch (e) {}
+  const email = String(req.user.email || '').toLowerCase().trim();
+  let user = db.get('users').find({ email }).value();
   if (!user) {
-    // JWT var ama DB soğuk — stub (kalıcı DB yüklenene kadar)
     return res.json({
-      email: req.user.email,
-      name: (req.user.email || '').split('@')[0],
+      email: email,
+      name: email.split('@')[0],
       license: null,
       _stub: true,
     });
   }
-  res.json({ email: user.email, name: user.name, license: user.license });
+  res.json({
+    email: user.email,
+    name: user.name,
+    license: user.license || null,
+  });
 });
 
 // ============================================================
@@ -1388,9 +1434,11 @@ app.post('/api/admin/license/revoke', adminAuth, async (req, res) => {
 });
 
 app.post('/api/admin/license/grant', adminAuth, async (req, res) => {
+  try { await ensureDb(true); } catch (e) {}
   const email = String(req.body?.email || '').toLowerCase().trim();
-  const days = Number(req.body?.days || 30);
+  const days = Math.max(1, Number(req.body?.days || 30));
   if (!email) return res.status(400).json({ error: 'E-posta gerekli.' });
+
   let user = db.get('users').find({ email }).value();
   if (!user) {
     user = {
@@ -1402,23 +1450,39 @@ app.post('/api/admin/license/grant', adminAuth, async (req, res) => {
     };
     db.get('users').push(user).write();
   }
+
   const key = genLicenseKey();
   const purchasedAt = Date.now();
-  db.get('users')
-    .find({ email })
-    .assign({
-      license: {
-        key,
-        purchasedAt,
-        durationDays: days,
-        activatedAt: null,
-        expiresAt: null,
-        active: true,
-      },
-    })
-    .write();
-  await saveDb();
-  res.json({ ok: true, key, days, email });
+  const activatedAt = purchasedAt;
+  const expiresAt = purchasedAt + days * 24 * 60 * 60 * 1000;
+  const license = {
+    key,
+    purchasedAt,
+    durationDays: days,
+    activatedAt,
+    expiresAt,
+    active: true,
+  };
+
+  db.get('users').find({ email }).assign({ license }).write();
+  snapshotToMemory();
+  const saved = await saveDb();
+  const check = db.get('users').find({ email }).value();
+  const hasLic = !!(check && check.license && check.license.key);
+
+  console.log('LICENSE GRANT', { email, key, days, expiresAt, saved, hasLic });
+  res.json({
+    ok: true,
+    key,
+    days,
+    email,
+    license,
+    persisted: !!saved,
+    hasLic,
+    message: !saved
+      ? 'KEY verildi ama Gist yazılamadı — GITHUB_TOKEN (gist yetkisi) ve GIST_ID kontrol et'
+      : 'KEY verildi ve aktifleştirildi',
+  });
 });
 
 

@@ -470,7 +470,8 @@
     box.innerHTML =
       '<div style="margin-bottom:4px"><b style="color:var(--ink);font-size:16px">' + (user.name || '—') + '</b></div>' +
       '<div style="color:var(--muted);font-size:13px;margin-bottom:4px">' + (user.email || '') + '</div>' +
-      badge + keyHtml + meta;
+      badge + keyHtml + meta +
+      '<button type="button" onclick="window.__refreshLicense&&window.__refreshLicense()" style="margin-top:10px;width:100%;padding:8px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;cursor:pointer">Lisansı yenile</button>';
     const dm = document.getElementById('done-msg');
     if(dm) dm.textContent = lic && lic.key
       ? (lic.activatedAt ? 'Lisansın hazır. Uygulamada KEY ile devam et.' : 'KEY hazır. Uygulamaya girince süre başlar.')
@@ -684,22 +685,34 @@
       show('step-done');
       fillAccount(user);
       applyBuyButton();
-      fetch(API_BASE + '/api/auth/me', { headers: { Authorization: 'Bearer ' + token } })
-        .then(r => {
-          if(r.status === 401){
-            localStorage.removeItem('my_token');
-            localStorage.removeItem('my_user');
-            document.body.classList.remove('authed');
-            showAuth('login');
-            return null;
-          }
-          return r.ok ? r.json() : null;
-        })
-        .then(data => {
-          if(!data) return;
-          localStorage.setItem('my_user', JSON.stringify(data));
-          fillAccount(data);
-        }).catch(() => {});
+      function refreshMe(){
+        const t = localStorage.getItem('my_token');
+        if(!t) return Promise.resolve();
+        return fetch(API_BASE + '/api/auth/me', { headers: { Authorization: 'Bearer ' + t }, cache: 'no-store' })
+          .then(r => {
+            if(r.status === 401){
+              localStorage.removeItem('my_token');
+              localStorage.removeItem('my_user');
+              document.body.classList.remove('authed');
+              showAuth('login');
+              return null;
+            }
+            return r.ok ? r.json() : null;
+          })
+          .then(data => {
+            if(!data) return;
+            localStorage.setItem('my_user', JSON.stringify(data));
+            fillAccount(data);
+          }).catch(() => {});
+      }
+      window.__refreshLicense = refreshMe;
+      refreshMe();
+      setInterval(function(){
+        if(localStorage.getItem('my_token')) refreshMe();
+      }, 15000);
+      document.addEventListener('visibilitychange', function(){
+        if(!document.hidden && localStorage.getItem('my_token')) refreshMe();
+      });
     }catch(e){
       console.warn('restore', e);
     }
