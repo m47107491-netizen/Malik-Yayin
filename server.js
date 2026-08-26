@@ -861,6 +861,79 @@ app.post('/api/auth/login', otpLimiter, async (req, res) => {
 });
 
 // ============================================================
+// ANDROID UYGULAMA GİRİŞİ — e-posta + KEY (şifre yok)
+// ============================================================
+app.post('/api/auth/app-login', otpLimiter, async (req, res) => {
+  try { await ensureDb(); } catch (e) {}
+  const email = String(req.body?.email || '').toLowerCase().trim();
+  const key = String(req.body?.key || req.body?.licenseKey || '').trim().toUpperCase();
+
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ ok: false, error: 'Geçerli e-posta gir.' });
+  }
+  if (!key) {
+    return res.status(400).json({ ok: false, error: 'KEY gerekli.' });
+  }
+
+  // KEY'e göre kullanıcı bul
+  let user = db
+    .get('users')
+    .find((u) => u.license && u.license.key && String(u.license.key).toUpperCase() === key)
+    .value();
+
+  if (!user || !user.license) {
+    return res.status(401).json({ ok: false, error: 'Geçersiz KEY.' });
+  }
+
+  // E-posta bu KEY'in sahibiyle eşleşmeli
+  if (String(user.email || '').toLowerCase() !== email) {
+    return res.status(401).json({ ok: false, error: 'E-posta bu KEY ile uyuşmuyor.' });
+  }
+
+  let license = { ...user.license };
+
+  if (license.active === false) {
+    return res.status(403).json({ ok: false, error: 'KEY iptal edilmiş.' });
+  }
+
+  // İlk girişte aktifleştir
+  if (!license.activatedAt) {
+    const days = Number(license.durationDays || process.env.LICENSE_DURATION_DAYS || 30);
+    const activatedAt = Date.now();
+    const expiresAt = activatedAt + days * 24 * 60 * 60 * 1000;
+    license = { ...license, activatedAt, expiresAt, active: true };
+    db.get('users').find({ email: user.email }).assign({ license }).write();
+    try {
+      const order = db.get('orders').find({ key: license.key }).value();
+      if (order) db.get('orders').find({ key: license.key }).assign({ activatedAt, used: true }).write();
+    } catch (e) {}
+    try { await saveDb(); } catch (e) {}
+  }
+
+  if (!license.expiresAt || license.expiresAt <= Date.now()) {
+    return res.status(403).json({
+      ok: false,
+      error: 'KEY süresi dolmuş.',
+      expiresAt: license.expiresAt || null,
+    });
+  }
+
+  const token = issueUserToken(user);
+  res.json({
+    ok: true,
+    token,
+    user: {
+      email: user.email,
+      name: user.name,
+      license: license,
+    },
+    licenseActive: true,
+    expiresAt: license.expiresAt,
+    isAdmin: false,
+  });
+});
+
+// ============================================================
 // ŞİFRE SIFIRLAMA — kod gönder
 // ============================================================
 app.post('/api/auth/send-code', otpLimiter, async (req, res) => {
