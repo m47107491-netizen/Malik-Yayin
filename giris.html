@@ -126,6 +126,12 @@
   }
   .pkg-mini .pl{ font-size:11px; color:var(--muted); }
   .pkg-mini .pp{ font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; margin-top:2px; }
+  .pkg-mini a.owned, .pkg-mini .owned{
+    opacity:.55; pointer-events:none; cursor:default;
+    border-color:rgba(34,197,94,.35) !important;
+  }
+  .pkg-mini .owned .pp{ font-size:13px; color:#4ade80; }
+  .pkg-mini .owned .pl{ color:#4ade80; }
   .howto{
     margin-top:14px; background:#0A101C; border:1px solid var(--card-line);
     border-radius:12px; padding:12px 14px; font-size:12.5px; color:var(--muted); text-align:left;
@@ -479,11 +485,20 @@
     const pkgBox = document.getElementById('pkg-box');
     if(pkgBox){
       const pkgs = [{d:7,p:30,l:'1 Hafta'},{d:30,p:70,l:'1 Ay'},{d:60,p:120,l:'2 Ay'},{d:365,p:500,l:'1 Yıl'}];
+      const licActive = !!(lic && lic.key && lic.active !== false && (!lic.expiresAt || lic.expiresAt > Date.now()));
+      const ownedDays = licActive ? Number(lic.durationDays || 0) : 0;
+      window.__ownedLicenseDays = ownedDays;
+      window.__licenseActive = licActive;
       pkgBox.innerHTML = pkgs.map(x => {
+        const already = licActive && ownedDays >= x.d;
+        if(already){
+          return '<div class="owned" style="border:1px solid var(--line);border-radius:12px;padding:12px 10px;text-align:center"><div class="pl">'+x.l+'</div><div class="pp">Satın alındı</div></div>';
+        }
         const url = (SHOPIER && SHOPIER[x.d]) || '#';
-        return '<a href="'+url+'" target="_blank" rel="noopener"><div class="pl">'+x.l+'</div><div class="pp">₺'+x.p+'</div></a>';
+        return '<a href="'+url+'" target="_blank" rel="noopener" onclick="return window.__guardBuy&&window.__guardBuy('+x.d+')"><div class="pl">'+x.l+'</div><div class="pp">₺'+x.p+'</div></a>';
       }).join('');
     }
+    applyBuyButton();
   }
 
   function copyKey(){
@@ -499,14 +514,55 @@
     if(!btn) return;
     let pkg = {};
     try { pkg = JSON.parse(localStorage.getItem('my_pkg') || '{}'); } catch(e) {}
-    btn.textContent = 'KEY Al — ₺' + (pkg.price || 70);
+    const days = Number(pkg.days || 30);
+    const owned = Number(window.__ownedLicenseDays || 0);
+    const active = !!window.__licenseActive;
+    if(active && owned >= 365){
+      btn.textContent = 'Tüm paketler satın alındı';
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      btn.onclick = null;
+      return;
+    }
+    if(active && owned >= days){
+      // Seçili paket zaten var → bir üst paketi öner
+      const tiers = [{d:7,p:30},{d:30,p:70},{d:60,p:120},{d:365,p:500}];
+      const up = tiers.find(t => t.d > owned);
+      if(up){
+        btn.textContent = 'Yükselt — ₺' + up.p;
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.onclick = function(){ window.open((SHOPIER && SHOPIER[up.d]) || '#', '_blank', 'noopener'); };
+        return;
+      }
+      btn.textContent = 'Tüm paketler satın alındı';
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      return;
+    }
+    btn.disabled = false;
     btn.style.opacity = '1';
+    btn.textContent = 'KEY Al — ₺' + (pkg.price || 70);
+    btn.onclick = goToBuy;
   }
+
+  window.__guardBuy = function(days){
+    const owned = Number(window.__ownedLicenseDays || 0);
+    if(window.__licenseActive && owned >= days){
+      alert('Bu paket (veya daha üstü) zaten hesabında. Süre bitene kadar tekrar alınmaz.');
+      return false;
+    }
+    return true;
+  };
 
   function goToBuy(){
     let pkg = {};
     try { pkg = JSON.parse(localStorage.getItem('my_pkg') || '{}'); } catch(e) {}
-    const days = pkg.days || 30;
+    const days = Number(pkg.days || 30);
+    if(window.__licenseActive && Number(window.__ownedLicenseDays || 0) >= days){
+      alert('Bu paket zaten hesabında. Süre bitene kadar tekrar alınmaz. Daha uzun paket seçebilirsin.');
+      return;
+    }
     const url = (SHOPIER && (SHOPIER[days] || SHOPIER[30])) || 'https://www.shopier.com/malik__yayin/50221155';
     window.open(url, '_blank', 'noopener');
   }

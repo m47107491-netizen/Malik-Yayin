@@ -100,6 +100,10 @@
     background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#1A0A06;
     font-weight:700; font-size:13px; font-family:inherit;
   }
+  .pkg.owned{ opacity:.75; border-color:rgba(34,197,94,.4); }
+  .pkg.owned .buy{
+    background:rgba(34,197,94,.18) !important; color:#4ade80 !important; cursor:default;
+  }
   .faq-item{ background:var(--card); border:1px solid var(--line); border-radius:12px; margin-bottom:8px; overflow:hidden; }
   .faq-q{
     width:100%; text-align:left; background:none; border:none; color:var(--ink);
@@ -249,16 +253,51 @@
     document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
     if(!open) item.classList.add('open');
   }
+  function getOwnedDays(){
+    try{
+      const user = JSON.parse(localStorage.getItem('my_user') || 'null');
+      const lic = user && user.license;
+      if(!lic || !lic.key || lic.active === false) return 0;
+      if(lic.expiresAt && lic.expiresAt <= Date.now()) return 0;
+      return Number(lic.durationDays || 0);
+    }catch(e){ return 0; }
+  }
+
   function goBuy(days, price){
+    const owned = getOwnedDays();
+    if(owned >= days){
+      alert('Bu paket (veya daha üstü) zaten hesabında. Süre bitene kadar tekrar alınmaz.');
+      return;
+    }
     const url = SHOPIER[days] || SHOPIER[30];
     if(!url){ alert('Paket linki bulunamadı.'); return; }
     try{ localStorage.setItem('my_pkg', JSON.stringify({ days, price })); }catch(e){}
     window.open(url, '_blank', 'noopener');
   }
+
+  function markOwnedPackages(){
+    const owned = getOwnedDays();
+    const map = {7:0, 30:1, 60:2, 365:3};
+    document.querySelectorAll('.pkg-grid .pkg').forEach(function(el, idx){
+      const days = [7,30,60,365][idx];
+      const btn = el.querySelector('.buy');
+      if(!btn) return;
+      if(owned >= days){
+        el.classList.add('owned');
+        btn.textContent = 'Satın alındı';
+        btn.onclick = function(e){ e.preventDefault(); alert('Bu paket zaten hesabında. Süre bitene kadar tekrar alınmaz.'); };
+      } else {
+        el.classList.remove('owned');
+        btn.textContent = 'Satın Al';
+        btn.setAttribute('onclick', 'goBuy('+days+','+({7:30,30:70,60:120,365:500}[days])+')');
+      }
+    });
+  }
+
   function tryDownload(){
     location.href = '/MalikYayin.apk';
   }
-  (function(){ updateNavAuth(); })();
+  (function(){ updateNavAuth(); markOwnedPackages(); })();
 
   function updateNavAuth(){
     try{
@@ -281,6 +320,7 @@
         }
         if(navOut) navOut.style.display = 'none';
       }
+      markOwnedPackages();
     }catch(e){}
   }
 
