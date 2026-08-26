@@ -70,8 +70,15 @@ function writeAppConfig(next) {
   } catch (e) {
     console.error('appConfig disk yazılamadı:', e.message);
   }
-  // Opsiyonel: GitHub Gist (GIST_ID + GITHUB_TOKEN) — gerçekten kalıcı
-  persistGist().catch((e) => console.warn('Gist kayıt:', e.message));
+  // Önce DB yükle, sonra kaydet — boş users ile Gist ezilmesin
+  (async () => {
+    try {
+      await ensureDb(true);
+      await persistGist();
+    } catch (e) {
+      console.warn('Gist kayıt (appConfig):', e.message || e);
+    }
+  })();
 }
 
 async function persistGist() {
@@ -80,17 +87,63 @@ async function persistGist() {
     console.warn('persistGist: GITHUB_TOKEN yok');
     throw new Error('GITHUB_TOKEN yok');
   }
+
+  let users = db.get('users').value() || [];
+  let orders = db.get('orders').value() || [];
+
+  // GÜVENLIK: Yerel boşsa Gist'teki kullanıcıları ezme
+  const gistId = (process.env.GIST_ID || '').trim();
+  const repo = (process.env.GITHUB_REPO || '').trim();
+  const path = (process.env.GITHUB_DB_PATH || 'malikyayin-db.json').trim();
+
+  if ((!users || users.length === 0) && (gistId || repo)) {
+    try {
+      let raw = null;
+      if (gistId) {
+        const r = await fetch('https://api.github.com/gists/' + gistId, {
+          headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+        });
+        if (r.ok) {
+          const data = await r.json();
+          const file = data.files && data.files['malikyayin-db.json'];
+          if (file && file.content) raw = file.content;
+        }
+      } else if (repo) {
+        const apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + path;
+        const r = await fetch(apiBase + '?ref=' + encodeURIComponent(process.env.GITHUB_BRANCH || 'main'), {
+          headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (data.content) raw = Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf8');
+        }
+      }
+      if (raw) {
+        const remote = JSON.parse(raw);
+        if (Array.isArray(remote.users) && remote.users.length > 0) {
+          console.warn('persistGist: yerel users bos, Gist korunuyor (' + remote.users.length + ' kullanici)');
+          users = remote.users;
+          db.set('users', users).write();
+          snapshotToMemory();
+          if ((!orders || orders.length === 0) && Array.isArray(remote.orders) && remote.orders.length) {
+            orders = remote.orders;
+            db.set('orders', orders).write();
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('persistGist koruma okuma:', e.message || e);
+    }
+  }
+
   const payload = {
-    users: db.get('users').value() || [],
-    orders: db.get('orders').value() || [],
+    users: users,
+    orders: orders,
     appConfig: readAppConfig(),
     otps: [],
     captchas: [],
   };
   const content = JSON.stringify(payload, null, 2);
-  const gistId = (process.env.GIST_ID || '').trim();
-  const repo = (process.env.GITHUB_REPO || '').trim(); // örn: m47107491-netizen/Malik-Yayin
-  const path = (process.env.GITHUB_DB_PATH || 'malikyayin-db.json').trim();
 
   // 1) GitHub Gist
   if (gistId) {
