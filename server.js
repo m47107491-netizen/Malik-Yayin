@@ -433,7 +433,8 @@ app.use('/api/payment/paytr/callback', bodyParser.urlencoded({ extended: false }
 
 const PORT = process.env.PORT || 3000;
 const APP_URL = (process.env.APP_URL || 'https://malikyayin.com').replace(/\/$/, '');
-const APK_DOWNLOAD_URL = `${APP_URL}/MalikYayin.apk`;
+const APK_DOWNLOAD_URL = process.env.APK_DOWNLOAD_URL
+  || 'https://github.com/m47107491-netizen/Malik-Yayin/releases/download/v1.0/MalikYayin.apk';
 
 // Statik dosyalar: HTML sayfalar + APK
 app.use(express.static(path.join(__dirname), {
@@ -1872,15 +1873,9 @@ app.post('/api/payment/paytr/callback', async (req, res) => {
   res.send('OK');
 });
 
-// APK indirme
+// APK indirme — GitHub Release'e yönlendirir
 app.get('/download/apk', (req, res) => {
-  const apkPath = path.join(__dirname, 'MalikYayin.apk');
-  res.download(apkPath, 'MalikYayin.apk', (err) => {
-    if (err) {
-      console.error('APK indirme hatası:', err.message);
-      if (!res.headersSent) res.status(404).send('APK bulunamadı.');
-    }
-  });
+  res.redirect(302, APK_DOWNLOAD_URL);
 });
 
 if (!process.env.VERCEL) {
