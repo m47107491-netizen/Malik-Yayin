@@ -1082,19 +1082,141 @@ app.post('/api/auth/register-verify', otpLimiter, async (req, res) => {
 });
 
 // ============================================================
-// GİRİŞ — e-posta + şifre
+// GİRİŞ — e-posta + kod (admin ile aynı akış)
+// 1) POST /api/auth/send-login-code  → kod mail
+// 2) POST /api/auth/login            → kod doğrula, token ver
+// (Eski şifre girişi de desteklenir: body'de password varsa)
 // ============================================================
-app.post('/api/auth/login', otpLimiter, async (req, res) => {
+app.post('/api/auth/send-login-code', otpLimiter, async (req, res) => {
   const email = String(req.body?.email || '').toLowerCase().trim();
-  const password = String(req.body?.password || '');
   const hp = checkHoneypot(req.body);
   if (!hp.ok) return res.status(400).json({ error: hp.error });
 
-  const cap = await consumeCaptcha(req.body, req);
-  if (!cap.ok) return res.status(400).json({ error: cap.error });
+  // Captcha opsiyonel — mobil/UX için gevşek; varsa doğrula
+  if (req.body?.captchaId || req.body?.gRecaptchaResponse || req.body?.robotChecked) {
+    const cap = await consumeCaptcha(req.body, req);
+    if (!cap.ok) return res.status(400).json({ error: cap.error });
+  }
+
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: 'Geçerli bir e-posta girin.' });
+  }
+
+  const user = db.get('users').find({ email }).value();
+  // Enumeration önleme: kullanıcı yoksa da aynı genel mesaj
+  if (!user) {
+    return res.json({
+      ok: true,
+      message: 'Kod gönderildiyse e-postanı kontrol et (spam dahil).',
+      otpToken: null,
+    });
+  }
+
+  const code = genCode();
+  const expiresAt = Date.now() + 10 * 60 * 1000;
+  const otpToken = createOtpToken({ purpose: 'login', email, code, exp: expiresAt });
+
+  try {
+    db.get('otps').remove({ email }).write();
+    db.get('otps').push({ email, code, expiresAt, attempts: 0, purpose: 'login' }).write();
+  } catch (e) {}
+
+  const displayName = user.name || email.split('@')[0];
+  const mail = await sendOtpMail(email, displayName, code, 'login');
+  if (!mail.ok) {
+    try { db.get('otps').remove({ email }).write(); } catch (e) {}
+    return res.status(500).json({ error: mail.error || 'Kod gönderilemedi, SMTP ayarlarını kontrol edin.' });
+  }
+
+  const payload = {
+    ok: true,
+    otpToken,
+    message: 'Giriş kodu e-postana gönderildi. Spam klasörüne bak.',
+    via: mail.via || null,
+  };
+  if (process.env.OTP_RETURN_CODE === '1' || process.env.OTP_DEBUG === '1' || mail.debug) {
+    payload.devCode = code;
+  }
+  res.json(payload);
+});
+
+app.post('/api/auth/login', otpLimiter, async (req, res) => {
+  const email = String(req.body?.email || '').toLowerCase().trim();
+  const password = String(req.body?.password || '');
+  const code = String(req.body?.code || '').trim();
+  const otpToken = String(req.body?.otpToken || '');
+  const hp = checkHoneypot(req.body);
+  if (!hp.ok) return res.status(400).json({ error: hp.error });
+
+  // --- Kod ile giriş (tercih edilen) ---
+  if (code) {
+    if (!email) return res.status(400).json({ error: 'E-posta ve kod gerekli.' });
+
+    let codeOk = false;
+    const tokenData = readOtpToken(otpToken);
+    if (tokenData && tokenData.purpose === 'login' && tokenData.email === email) {
+      codeOk = String(tokenData.code) === String(code);
+      if (!codeOk) return res.status(400).json({ error: 'Kod hatalı.' });
+    } else {
+      const record = db.get('otps').find({ email }).value();
+      if (!record || record.purpose !== 'login') {
+        return res.status(400).json({ error: 'Önce e-posta ile kod iste.' });
+      }
+      if (record.attempts >= 5) {
+        return res.status(429).json({ error: 'Çok fazla yanlış deneme. Yeni kod iste.' });
+      }
+      if (Date.now() > record.expiresAt) {
+        return res.status(400).json({ error: 'Kodun süresi doldu, yeni kod iste.' });
+      }
+      if (String(record.code) !== String(code)) {
+        db.get('otps').find({ email }).assign({ attempts: (record.attempts || 0) + 1 }).write();
+        return res.status(400).json({ error: 'Kod hatalı.' });
+      }
+      codeOk = true;
+    }
+
+    if (!codeOk) return res.status(401).json({ error: 'E-posta veya kod hatalı.' });
+
+    const user = db.get('users').find({ email }).value();
+    if (!user) return res.status(401).json({ error: 'E-posta veya kod hatalı.' });
+
+    try { db.get('otps').remove({ email }).write(); } catch (e) {}
+    const token = issueUserToken(user);
+    const pub = publicUser(user);
+    if (email === ADMIN_EMAIL) pub.isAdmin = true;
+    return res.json({ ok: true, token, user: pub, isAdmin: email === ADMIN_EMAIL });
+  }
+
+  // --- Şifre ile giriş (ana akış) ---
+  if (req.body?.captchaId || req.body?.gRecaptchaResponse || req.body?.robotChecked) {
+    const cap = await consumeCaptcha(req.body, req);
+    if (!cap.ok) return res.status(400).json({ error: cap.error });
+  }
 
   if (!email || !password) {
     return res.status(400).json({ error: 'E-posta ve şifre gerekli.' });
+  }
+
+  // Admin e-postası + ADMIN_PASSWORD ile de giriş (ortak giriş)
+  if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+    let adminUser = db.get('users').find({ email }).value();
+    if (!adminUser) {
+      adminUser = {
+        id: crypto.randomUUID(),
+        email: ADMIN_EMAIL,
+        name: 'Admin',
+        passwordHash: hashPassword(ADMIN_PASSWORD),
+        createdAt: Date.now(),
+        license: null,
+        isAdmin: true,
+      };
+      db.get('users').push(adminUser).write();
+      try { await saveDb(); } catch (e) {}
+    }
+    const token = issueUserToken(adminUser);
+    const pub = publicUser(adminUser);
+    pub.isAdmin = true;
+    return res.json({ ok: true, token, user: pub, isAdmin: true });
   }
 
   const user = db.get('users').find({ email }).value();
@@ -1106,7 +1228,9 @@ app.post('/api/auth/login', otpLimiter, async (req, res) => {
   }
 
   const token = issueUserToken(user);
-  res.json({ ok: true, token, user: publicUser(user) });
+  const pub = publicUser(user);
+  if (email === ADMIN_EMAIL) pub.isAdmin = true;
+  res.json({ ok: true, token, user: pub, isAdmin: email === ADMIN_EMAIL });
 });
 
 // ============================================================

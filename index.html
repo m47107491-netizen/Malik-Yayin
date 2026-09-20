@@ -134,6 +134,7 @@
     <a class="logo" href="/"><span class="dot"></span>MalikYayın</a>
     <div class="nav-r">
       <a class="btn btn-ghost" href="#paketler">Paketler</a>
+      <a class="btn btn-ghost" id="nav-admin" href="admin.html" style="display:none;border-color:rgba(255,176,32,.45);color:var(--gold)">Admin</a>
       <a class="btn btn-ghost" id="nav-account" href="giris.html">Giriş</a>
       <button class="btn btn-ghost" id="nav-logout" type="button" onclick="siteLogout()" style="display:none">Çıkış</button>
       <a class="btn btn-primary" id="nav-buy" href="#paketler">KEY Al</a>
@@ -299,6 +300,14 @@
   }
   (function(){ updateNavAuth(); markOwnedPackages(); })();
 
+  function isAdminUser(user){
+    if(!user) return false;
+    if(user.isAdmin === true) return true;
+    if(!user.email) return false;
+    const adminEmail = String(window.MALIKYAYIN_ADMIN_EMAIL || 'maliksponsorluk@gmail.com').toLowerCase().trim();
+    return String(user.email).toLowerCase().trim() === adminEmail;
+  }
+
   function updateNavAuth(){
     try{
       const token = localStorage.getItem('my_token');
@@ -306,6 +315,7 @@
       const navAcc = document.getElementById('nav-account');
       const navOut = document.getElementById('nav-logout');
       const navBuy = document.getElementById('nav-buy');
+      const navAdmin = document.getElementById('nav-admin');
       if(navBuy){ navBuy.textContent = 'KEY Al'; navBuy.href = '#paketler'; }
       if(token && user){
         if(navAcc){
@@ -313,12 +323,20 @@
           navAcc.href = 'giris.html';
         }
         if(navOut) navOut.style.display = 'inline-flex';
+        if(navAdmin){
+          if(isAdminUser(user)){
+            navAdmin.style.display = 'inline-flex';
+          } else {
+            navAdmin.style.display = 'none';
+          }
+        }
       } else {
         if(navAcc){
           navAcc.textContent = 'Giriş';
           navAcc.href = 'giris.html';
         }
         if(navOut) navOut.style.display = 'none';
+        if(navAdmin) navAdmin.style.display = 'none';
       }
       markOwnedPackages();
     }catch(e){}

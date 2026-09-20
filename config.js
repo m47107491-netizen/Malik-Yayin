@@ -10,3 +10,6 @@ window.MALIKYAYIN_SHOPIER = {
 };
 
 window.MALIKYAYIN_RECAPTCHA_SITE_KEY = window.MALIKYAYIN_RECAPTCHA_SITE_KEY || '';
+
+// Admin paneli linki (bu e-posta ile giriş yapan ana sayfada Admin görür)
+window.MALIKYAYIN_ADMIN_EMAIL = (window.MALIKYAYIN_ADMIN_EMAIL || 'maliksponsorluk@gmail.com').toLowerCase().trim();

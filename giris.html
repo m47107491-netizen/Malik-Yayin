@@ -454,6 +454,8 @@
     const box = document.getElementById('account-box');
     if(!box || !user) return;
     document.body.classList.add('authed');
+    const adminEmail = String(window.MALIKYAYIN_ADMIN_EMAIL || 'maliksponsorluk@gmail.com').toLowerCase().trim();
+    const isAdmin = user.isAdmin === true || (user.email && String(user.email).toLowerCase().trim() === adminEmail);
     const lic = user.license || null;
     let badge = '<span class="acc-status none">Lisans yok</span>';
     let keyHtml = '';
@@ -499,6 +501,10 @@
       }).join('');
     }
     applyBuyButton();
+    if(isAdmin && box){
+      box.insertAdjacentHTML('afterbegin', '<div style="margin-bottom:12px;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,176,32,.35);background:rgba(255,176,32,.08)"><b style="color:#FBBF24">Admin hesabı</b><div class="muted" style="margin-top:4px;font-size:12.5px">Yönetim paneline gidebilirsin.</div><a class="btn" href="admin.html" style="margin-top:10px;display:inline-flex;text-decoration:none;color:inherit">Admin Panel</a></div>');
+    }
+
   }
 
   function copyKey(){
