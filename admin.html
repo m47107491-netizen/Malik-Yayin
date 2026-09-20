@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Yönetim - MalikYayin</title>
+<title>Yönetim — MalikYayın</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -91,6 +91,7 @@ code{background:#0A101C;padding:3px 7px;border-radius:6px;font-size:11.5px;borde
       <button class="nav-btn" data-page="keys" type="button" onclick="goPage('keys')">KEY Islemleri</button>
       <button class="nav-btn" data-page="site" type="button" onclick="goPage('site')">Site ve Uygulama</button>
       <div class="side-foot">
+        <a href="giris.html" class="nav-btn" style="margin-bottom:8px;text-align:center">Hesabım</a>
         <div class="muted" id="admin-email" style="margin-bottom:8px;font-size:11.5px;word-break:break-all"></div>
         <button class="btn btn-ghost btn-sm btn-block" type="button" onclick="refresh()">Yenile</button>
         <button class="btn btn-ghost btn-sm btn-block" type="button" onclick="logout()" style="margin-top:6px">Cikis</button>
@@ -203,7 +204,7 @@ function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;',
 function fmtDate(ts){if(!ts)return '-';try{return new Date(ts).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return '-'}}
 function copyText(t){if(!t)return;navigator.clipboard.writeText(t).then(()=>alert('Kopyalandi')).catch(()=>prompt('Kopyala:',t))}
 function logout(){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem('my_admin_email');localStorage.removeItem('my_token');localStorage.removeItem('my_user');if(isEmbed()&&window.parent){try{window.parent.location.href='giris.html'}catch(e){location.href='giris.html'}}else location.href='giris.html'}
-function openPanel(){document.getElementById('login-view').classList.add('hidden');document.getElementById('panel-view').classList.remove('hidden');document.getElementById('admin-email').textContent=localStorage.getItem('my_admin_email')||'';goPage('dash');refresh()}
+function openPanel(){var lv=document.getElementById('login-view');if(lv)lv.classList.add('hidden');var pv=document.getElementById('panel-view');if(pv)pv.classList.remove('hidden');var ae=document.getElementById('admin-email');if(ae)ae.textContent=localStorage.getItem('my_admin_email')||'';goPage('dash');refresh()}
 function goPage(name){['dash','users','orders','keys','site'].forEach(p=>document.getElementById('page-'+p).classList.toggle('hidden',p!==name));document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===name))}
 function licStatus(lic){if(!lic||!lic.key)return{html:'<span class="badge wait">KEY yok</span>'};if(lic.active===false)return{html:'<span class="badge fail">Iptal</span>'};if(lic.expiresAt&&lic.expiresAt<Date.now())return{html:'<span class="badge fail">Suresi dolmus</span>'};if(!lic.activatedAt)return{html:'<span class="badge wait">Aktiflestirilmedi</span>'};return{html:'<span class="badge ok">Aktif</span>'}}
 function renderUsers(list){
@@ -325,42 +326,35 @@ async function setForceUpdate(on){
   }
 }
 
-function isEmbed(){ return /(?:\?|&)embed=1(?:&|$)/.test(location.search || ''); }
-
 function bootAdmin(){
-  const embed = isEmbed();
-  // Doğrudan /admin.html açılırsa → giriş sayfasına (ayrı admin girişi yok)
-  if(!embed && !token()){
-    location.replace('giris.html');
-    return;
+  // Ortak oturum: my_token + admin e-posta
+  let ok = false;
+  try{
+    const t = localStorage.getItem('my_token');
+    const raw = localStorage.getItem('my_user');
+    if(t && raw){
+      const u = JSON.parse(raw);
+      const adminEmail = String((window.MALIKYAYIN_ADMIN_EMAIL || 'maliksponsorluk@gmail.com')).toLowerCase().trim();
+      if(u && (u.isAdmin === true || (u.email && String(u.email).toLowerCase().trim() === adminEmail))){
+        localStorage.setItem(TOKEN_KEY, t);
+        localStorage.setItem('my_admin_email', u.email || adminEmail);
+        ok = true;
+      }
+    }
+  }catch(e){}
+  if(!ok){
+    // Eski admin token dene
+    if(localStorage.getItem(TOKEN_KEY)) ok = true;
   }
-  if(token()){
+  if(ok){
     openPanel();
-    if(embed){
-      document.body.classList.add('embed');
-      const login = document.getElementById('login-view');
-      if(login) login.classList.add('hidden');
-    }
     return;
   }
-  // embed ama oturum yok
-  if(embed){
-    document.body.classList.add('embed');
-    const login = document.getElementById('login-view');
-    if(login){
-      login.innerHTML = '<div class="login-card"><p class="muted" style="margin:0">Oturum bulunamadı. Ana girişten admin e-posta ile kod alıp gir.</p></div>';
-    }
-  }
+  // Oturum yok → normal giriş
+  location.replace('giris.html');
 }
 
-(function(){
-  if(isEmbed()){
-    const style = document.createElement('style');
-    style.textContent = 'body.embed .glow{display:none}body.embed #login-view.hidden{display:none!important}body.embed .side{position:relative;height:auto}body.embed .shell{min-height:auto}body.embed .side-foot .btn{display:none}';
-    document.head.appendChild(style);
-  }
-  bootAdmin();
-})();
+bootAdmin();
 </script>
 </body>
 </html>

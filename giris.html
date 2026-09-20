@@ -291,14 +291,6 @@
   </div>
 
   <div class="step" id="step-done">
-    <div id="admin-embed-wrap" style="display:none;margin:0 -4px 16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
-        <h1 style="margin:0;font-size:20px">Yönetim</h1>
-        <button type="button" class="link" id="admin-embed-toggle" onclick="toggleAdminEmbed()">Hesabım</button>
-      </div>
-      <iframe id="admin-embed" title="Admin" style="width:100%;min-height:70vh;border:1px solid var(--line);border-radius:14px;background:#0A101C" src="about:blank"></iframe>
-    </div>
-    <div id="user-account-wrap">
     <h1>Hesabım</h1>
     <p class="sub" id="done-msg">Oturumun açık.</p>
     <div id="account-box"></div>
@@ -598,47 +590,16 @@
 
   function enterAccount(token, user){
     saveSession(token, user);
+    const adminEmail = String(window.MALIKYAYIN_ADMIN_EMAIL || 'maliksponsorluk@gmail.com').toLowerCase().trim();
+    const isAdmin = user && (user.isAdmin === true || (user.email && String(user.email).toLowerCase().trim() === adminEmail));
+    if(isAdmin){
+      // Aynı oturum — iframe yok, yönetim sayfası (localStorage paylaşılır)
+      location.replace('admin.html');
+      return;
+    }
     fillAccount(user);
     applyBuyButton();
     show('step-done');
-    setupAdminEmbed(user);
-  }
-
-  function setupAdminEmbed(user){
-    const wrap = document.getElementById('admin-embed-wrap');
-    const frame = document.getElementById('admin-embed');
-    const userWrap = document.getElementById('user-account-wrap');
-    if(!wrap || !frame) return;
-    const adminEmail = String(window.MALIKYAYIN_ADMIN_EMAIL || 'maliksponsorluk@gmail.com').toLowerCase().trim();
-    const isAdmin = user && (user.isAdmin === true || (user.email && String(user.email).toLowerCase().trim() === adminEmail));
-    if(!isAdmin){
-      wrap.style.display = 'none';
-      if(userWrap) userWrap.style.display = 'block';
-      frame.src = 'about:blank';
-      return;
-    }
-    // Admin: panel sitede (iframe), ayrı sayfaya gitmez
-    wrap.style.display = 'block';
-    if(userWrap) userWrap.style.display = 'none';
-    const btn = document.getElementById('admin-embed-toggle');
-    if(btn) btn.textContent = 'Hesabım';
-    frame.src = 'admin.html?embed=1&t=' + encodeURIComponent(Date.now());
-  }
-
-  function toggleAdminEmbed(){
-    const userWrap = document.getElementById('user-account-wrap');
-    const frame = document.getElementById('admin-embed');
-    const btn = document.getElementById('admin-embed-toggle');
-    if(!userWrap) return;
-    const showingUser = userWrap.style.display !== 'none';
-    if(showingUser){
-      userWrap.style.display = 'none';
-      if(frame) frame.parentElement.style.display = 'block';
-      if(btn) btn.textContent = 'Hesabım';
-    } else {
-      userWrap.style.display = 'block';
-      if(btn) btn.textContent = 'Yönetim';
-    }
   }
 
   let loginOtpToken = '';
@@ -843,7 +804,6 @@
       show('step-done');
       fillAccount(user);
       applyBuyButton();
-      setupAdminEmbed(user);
       function refreshMe(){
         const t = localStorage.getItem('my_token');
         if(!t) return Promise.resolve();
