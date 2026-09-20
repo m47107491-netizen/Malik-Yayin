@@ -93,7 +93,7 @@ code{background:#0A101C;padding:3px 7px;border-radius:6px;font-size:11.5px;borde
       <button class="btn btn-primary btn-block" id="login-btn" type="button" onclick="doLogin()">Giris Yap</button>
       <button class="btn btn-ghost btn-block" type="button" style="margin-top:8px" onclick="backToEmail()">&larr; E-postayi degistir / yeniden kod</button>
     </div>
-    <div class="hint">Kullanici girisi icin <a href="giris.html" style="color:var(--cyan)">giris.html</a></div>
+    <div class="hint" id="admin-login-hint" style="display:none"></div>
   </div>
 </div>
 <div id="panel-view" class="hidden">
@@ -374,6 +374,40 @@ async function setForceUpdate(on){
 
 if(token())openPanel();
 
+
+function isEmbed(){return /(?:\?|&)embed=1(?:&|$)/.test(location.search||'')}
+function trySharedSession(){
+  try{
+    const t=localStorage.getItem('my_token');
+    const raw=localStorage.getItem('my_user');
+    if(!t||!raw)return false;
+    const u=JSON.parse(raw);
+    const adminEmail=String((window.MALIKYAYIN_ADMIN_EMAIL||'maliksponsorluk@gmail.com')).toLowerCase().trim();
+    const ok=u&&(u.isAdmin===true||(u.email&&String(u.email).toLowerCase().trim()===adminEmail));
+    if(!ok)return false;
+    localStorage.setItem(TOKEN_KEY,t);
+    localStorage.setItem('my_admin_email',u.email||adminEmail);
+    return true;
+  }catch(e){return false}
+}
+(function bootAdmin(){
+  if(trySharedSession()){
+    openPanel();
+    if(isEmbed()){
+      document.body.classList.add('embed');
+      const login=document.getElementById('login-view');
+      if(login)login.classList.add('hidden');
+    }
+  } else if(isEmbed()){
+    // embed ama oturum yok — boş
+    document.getElementById('login-view').innerHTML='<div class="login-card"><p class="muted">Önce siteden admin e-posta ile giriş yap.</p></div>';
+  }
+  if(isEmbed()){
+    const style=document.createElement('style');
+    style.textContent='body.embed .glow{display:none}body.embed #login-view{display:none!important}body.embed .side{position:relative;height:auto;min-height:auto}body.embed .shell{min-height:auto}';
+    document.head.appendChild(style);
+  }
+})();
 </script>
 </body>
 </html>

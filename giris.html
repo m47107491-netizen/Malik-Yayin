@@ -168,29 +168,38 @@
       <button type="button" onclick="showAuth('register')">Kayıt Ol</button>
     </div>
     <h1>Giriş yap</h1>
-    <p class="sub">E-posta ve şifrenle hesabına gir.</p>
+    <p class="sub">E-postana kod gönderilir, kod ile giriş yaparsın.</p>
     <div class="hp-wrap" aria-hidden="true">
       <label for="login-website">Website</label>
       <input id="login-website" type="text" name="website" tabindex="-1" autocomplete="off">
       <input id="login-company" type="text" name="company" tabindex="-1" autocomplete="off">
     </div>
     <input type="hidden" id="login-started" value="">
-    <label for="login-email">E-posta</label>
-    <input id="login-email" type="email" placeholder="ornek@eposta.com" autocomplete="username">
-    <label for="login-pass">Şifre</label>
-    <input id="login-pass" type="password" placeholder="Şifren" autocomplete="current-password">
-    <div id="login-robot-wrap">
-      <div class="robot-box" id="login-robot" onclick="toggleRobot('login')" role="checkbox" aria-checked="false" tabindex="0">
-        <div class="robot-check" id="login-robot-tick"></div>
-        <div class="robot-label">Ben robot değilim</div>
-        <div class="robot-logo"><b>Malik</b><br>güvenlik</div>
+    <div id="login-phase-email">
+      <label for="login-email">E-posta</label>
+      <input id="login-email" type="email" placeholder="ornek@eposta.com" autocomplete="username">
+      <div id="login-robot-wrap">
+        <div class="robot-box" id="login-robot" onclick="toggleRobot('login')" role="checkbox" aria-checked="false" tabindex="0">
+          <div class="robot-check" id="login-robot-tick"></div>
+          <div class="robot-label">Ben robot değilim</div>
+          <div class="robot-logo"><b>Malik</b><br>güvenlik</div>
+        </div>
+        <input type="hidden" id="login-cap-id" value="">
+        <input type="hidden" id="login-cap-a" value="0">
       </div>
-      <input type="hidden" id="login-cap-id" value="">
-      <input type="hidden" id="login-cap-a" value="0">
+      <div id="login-grecaptcha" class="g-recaptcha" style="display:none"></div>
+      <div class="msg err" id="login-msg"></div>
+      <button class="btn" id="login-send-btn" type="button" onclick="sendLoginCode()">Kod Gönder</button>
     </div>
-    <div id="login-grecaptcha" class="g-recaptcha" style="display:none"></div>
-    <div class="msg err" id="login-msg"></div>
-    <button class="btn" id="login-btn" type="button" onclick="doLogin()">Giriş Yap</button>
+    <div id="login-phase-code" style="display:none">
+      <label>E-posta</label>
+      <input id="login-email-locked" type="email" disabled style="opacity:.75">
+      <label for="login-code" style="margin-top:10px">Doğrulama kodu</label>
+      <input id="login-code" class="code-input" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+      <div class="msg err" id="login-code-msg"></div>
+      <button class="btn" id="login-btn" type="button" onclick="doLogin()">Giriş Yap</button>
+      <button class="link" type="button" onclick="backToLoginEmail()">← E-postayı değiştir / yeniden kod</button>
+    </div>
     <button class="link" type="button" onclick="showAuth('reset')">Şifremi unuttum — kod ile sıfırla</button>
     <a class="back" href="index.html">← Ana sayfa</a>
   </div>
@@ -282,6 +291,14 @@
   </div>
 
   <div class="step" id="step-done">
+    <div id="admin-embed-wrap" style="display:none;margin:0 -4px 16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
+        <h1 style="margin:0;font-size:20px">Yönetim</h1>
+        <button type="button" class="link" id="admin-embed-toggle" onclick="toggleAdminEmbed()">Hesabım</button>
+      </div>
+      <iframe id="admin-embed" title="Admin" style="width:100%;min-height:70vh;border:1px solid var(--line);border-radius:14px;background:#0A101C" src="about:blank"></iframe>
+    </div>
+    <div id="user-account-wrap">
     <h1>Hesabım</h1>
     <p class="sub" id="done-msg">Oturumun açık.</p>
     <div id="account-box"></div>
@@ -501,9 +518,6 @@
       }).join('');
     }
     applyBuyButton();
-    if(isAdmin && box){
-      box.insertAdjacentHTML('afterbegin', '<div style="margin-bottom:12px;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,176,32,.35);background:rgba(255,176,32,.08)"><b style="color:#FBBF24">Admin hesabı</b><div class="muted" style="margin-top:4px;font-size:12.5px">Yönetim paneline gidebilirsin.</div><a class="btn" href="admin.html" style="margin-top:10px;display:inline-flex;text-decoration:none;color:inherit">Admin Panel</a></div>');
-    }
 
   }
 
@@ -587,28 +601,106 @@
     fillAccount(user);
     applyBuyButton();
     show('step-done');
+    setupAdminEmbed(user);
   }
 
-  async function doLogin(){
+  function setupAdminEmbed(user){
+    const wrap = document.getElementById('admin-embed-wrap');
+    const frame = document.getElementById('admin-embed');
+    const userWrap = document.getElementById('user-account-wrap');
+    if(!wrap || !frame) return;
+    const adminEmail = String(window.MALIKYAYIN_ADMIN_EMAIL || 'maliksponsorluk@gmail.com').toLowerCase().trim();
+    const isAdmin = user && (user.isAdmin === true || (user.email && String(user.email).toLowerCase().trim() === adminEmail));
+    if(!isAdmin){
+      wrap.style.display = 'none';
+      if(userWrap) userWrap.style.display = 'block';
+      frame.src = 'about:blank';
+      return;
+    }
+    // Admin: panel sitede (iframe), ayrı sayfaya gitmez
+    wrap.style.display = 'block';
+    if(userWrap) userWrap.style.display = 'none';
+    frame.src = 'admin.html?embed=1&t=' + Date.now();
+  }
+
+  function toggleAdminEmbed(){
+    const userWrap = document.getElementById('user-account-wrap');
+    const frame = document.getElementById('admin-embed');
+    const btn = document.getElementById('admin-embed-toggle');
+    if(!userWrap) return;
+    const showingUser = userWrap.style.display !== 'none';
+    if(showingUser){
+      userWrap.style.display = 'none';
+      if(frame) frame.parentElement.style.display = 'block';
+      if(btn) btn.textContent = 'Hesabım';
+    } else {
+      userWrap.style.display = 'block';
+      if(btn) btn.textContent = 'Yönetim';
+    }
+  }
+
+  let loginOtpToken = '';
+
+  async function sendLoginCode(){
     const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-pass').value;
     setMsg('login-msg', '');
-    if(!email || !password){ setMsg('login-msg', 'E-posta ve şifre gir.'); return; }
-    const btn = document.getElementById('login-btn');
-    btn.disabled = true; btn.textContent = 'Giriş yapılıyor...';
+    if(!email || !email.includes('@')){ setMsg('login-msg', 'Geçerli e-posta gir.'); return; }
+    const btn = document.getElementById('login-send-btn');
+    btn.disabled = true; btn.textContent = 'Kod gönderiliyor...';
     try{
-      const r = await fetch(API_BASE + '/api/auth/login', {
+      const r = await fetch(API_BASE + '/api/auth/send-login-code', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ email, password, ...captchaPayload('login'), ...honeypotPayload('login') })
+        body: JSON.stringify({ email, ...captchaPayload('login'), ...honeypotPayload('login') })
       });
       const data = await r.json();
-      if(!r.ok) throw new Error(data.error || 'Giriş başarısız');
-      enterAccount(data.token, data.user);
+      if(!r.ok) throw new Error(data.error || 'Kod gönderilemedi');
+      loginOtpToken = data.otpToken || '';
+      document.getElementById('login-email-locked').value = email;
+      document.getElementById('login-phase-email').style.display = 'none';
+      document.getElementById('login-phase-code').style.display = 'block';
+      document.getElementById('login-code').value = '';
+      setMsg('login-code-msg', 'Kod gönderildi. Spam klasörünü de bak.', true);
+      document.getElementById('login-code').focus();
     }catch(e){
       setMsg('login-msg', e.message === 'Failed to fetch'
         ? 'Sunucuya bağlanılamadı. Backend / config.js kontrol et.'
         : e.message);
       loadCaptcha('login');
+    }finally{
+      btn.disabled = false; btn.textContent = 'Kod Gönder';
+    }
+  }
+
+  function backToLoginEmail(){
+    document.getElementById('login-phase-code').style.display = 'none';
+    document.getElementById('login-phase-email').style.display = 'block';
+    loginOtpToken = '';
+    setMsg('login-msg', '');
+    setMsg('login-code-msg', '');
+    loadCaptcha('login');
+  }
+
+  async function doLogin(){
+    const email = (document.getElementById('login-email-locked').value || document.getElementById('login-email').value).trim();
+    const code = document.getElementById('login-code').value.trim();
+    setMsg('login-code-msg', '');
+    if(!email || !code){ setMsg('login-code-msg', 'E-posta ve 6 haneli kodu gir.'); return; }
+    if(code.length !== 6){ setMsg('login-code-msg', '6 haneli kodu gir.'); return; }
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true; btn.textContent = 'Giriş yapılıyor...';
+    try{
+      const r = await fetch(API_BASE + '/api/auth/login', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email, code, otpToken: loginOtpToken, ...honeypotPayload('login') })
+      });
+      const data = await r.json();
+      if(!r.ok) throw new Error(data.error || 'Giriş başarısız');
+      if(data.isAdmin) data.user = Object.assign({}, data.user || {}, { isAdmin: true });
+      enterAccount(data.token, data.user);
+    }catch(e){
+      setMsg('login-code-msg', e.message === 'Failed to fetch'
+        ? 'Sunucuya bağlanılamadı. Backend / config.js kontrol et.'
+        : e.message);
     }finally{
       btn.disabled = false; btn.textContent = 'Giriş Yap';
     }
@@ -734,7 +826,9 @@
     }
   }
 
-  document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
+  document.getElementById('login-email').addEventListener('keydown', e => { if(e.key === 'Enter') sendLoginCode(); });
+  const loginCodeEl = document.getElementById('login-code');
+  if(loginCodeEl) loginCodeEl.addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
   document.getElementById('reg-pass2').addEventListener('keydown', e => { if(e.key === 'Enter') doRegister(); });
 
   (function restore(){
@@ -747,6 +841,7 @@
       show('step-done');
       fillAccount(user);
       applyBuyButton();
+      setupAdminEmbed(user);
       function refreshMe(){
         const t = localStorage.getItem('my_token');
         if(!t) return Promise.resolve();

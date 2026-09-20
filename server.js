@@ -1102,9 +1102,9 @@ app.post('/api/auth/send-login-code', otpLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Geçerli bir e-posta girin.' });
   }
 
-  const user = db.get('users').find({ email }).value();
-  // Enumeration önleme: kullanıcı yoksa da aynı genel mesaj
-  if (!user) {
+  let user = db.get('users').find({ email }).value();
+  // Admin e-postası kayıtlı olmasa da kod alabilir (ortak giriş)
+  if (!user && email !== ADMIN_EMAIL) {
     return res.json({
       ok: true,
       message: 'Kod gönderildiyse e-postanı kontrol et (spam dahil).',
@@ -1121,7 +1121,7 @@ app.post('/api/auth/send-login-code', otpLimiter, async (req, res) => {
     db.get('otps').push({ email, code, expiresAt, attempts: 0, purpose: 'login' }).write();
   } catch (e) {}
 
-  const displayName = user.name || email.split('@')[0];
+  const displayName = (user && user.name) || (email === ADMIN_EMAIL ? 'Admin' : email.split('@')[0]);
   const mail = await sendOtpMail(email, displayName, code, 'login');
   if (!mail.ok) {
     try { db.get('otps').remove({ email }).write(); } catch (e) {}
@@ -1177,7 +1177,20 @@ app.post('/api/auth/login', otpLimiter, async (req, res) => {
 
     if (!codeOk) return res.status(401).json({ error: 'E-posta veya kod hatalı.' });
 
-    const user = db.get('users').find({ email }).value();
+    let user = db.get('users').find({ email }).value();
+    if (!user && email === ADMIN_EMAIL) {
+      user = {
+        id: crypto.randomUUID(),
+        email: ADMIN_EMAIL,
+        name: 'Admin',
+        passwordHash: hashPassword(crypto.randomBytes(16).toString('hex')),
+        createdAt: Date.now(),
+        license: null,
+        isAdmin: true,
+      };
+      db.get('users').push(user).write();
+      try { await saveDb(); } catch (e) {}
+    }
     if (!user) return res.status(401).json({ error: 'E-posta veya kod hatalı.' });
 
     try { db.get('otps').remove({ email }).write(); } catch (e) {}
@@ -1466,11 +1479,18 @@ function adminAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Admin girişi gerekli.' });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    if (payload.role !== 'admin') {
-      return res.status(403).json({ error: 'Yetkisiz.' });
+    // Klasik admin JWT
+    if (payload.role === 'admin') {
+      req.admin = payload;
+      return next();
     }
-    req.admin = payload;
-    next();
+    // Ortak giriş: kullanıcı token'ı + admin e-postası da yeterli
+    const em = String(payload.email || '').toLowerCase().trim();
+    if (em && em === ADMIN_EMAIL) {
+      req.admin = { role: 'admin', email: ADMIN_EMAIL, uid: payload.uid || null };
+      return next();
+    }
+    return res.status(403).json({ error: 'Yetkisiz.' });
   } catch {
     res.status(401).json({ error: 'Admin oturumu geçersiz.' });
   }
