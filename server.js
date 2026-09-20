@@ -503,6 +503,7 @@ async function sendOtpMail(to, name, code, purpose) {
     register: 'MalikYayin dogrulama kodun: ' + code,
     reset: 'MalikYayin sifre sifirlama kodu: ' + code,
     login: 'MalikYayin giris kodun: ' + code,
+    admin: 'MalikYayin admin giris kodun: ' + code,
   };
   const subject = subjects[purpose] || ('MalikYayin kod: ' + code);
   const html = otpEmailHtml(name || String(to).split('@')[0], code);
@@ -683,6 +684,86 @@ function licenseEmailHtml(key, days) {
     </p>
     <p style="color:#888;font-size:12px;margin-top:32px">MalikYayın — TikTok LIVE Hediye Overlay</p>
   </div>`;
+}
+
+function reminderEmailHtml(name, daysLeft, expiresAt) {
+  const dateStr = expiresAt
+    ? new Date(expiresAt).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', dateStyle: 'medium', timeStyle: 'short' })
+    : '—';
+  const urgent = daysLeft <= 1;
+  const title = urgent ? 'Lisansın yarın bitiyor!' : 'Lisansın yakında bitiyor';
+  const packUrl = (process.env.APP_URL || 'https://malik-yayin-alpha.vercel.app').replace(/\/$/, '') + '/#paketler';
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1a1a1a">
+    <p style="margin:0 0 8px;font-size:13px;color:#888">MalikYayın</p>
+    <h2 style="margin:0 0 16px;color:#1a1a1a">${title}</h2>
+    <p style="margin:0 0 12px;line-height:1.5">Merhaba <b>${name || 'yayıncı'}</b>,</p>
+    <p style="margin:0 0 12px;line-height:1.5">
+      TikTok LIVE overlay lisansın <b>${daysLeft <= 1 ? 'yaklaşık 1 gün' : 'yaklaşık 3 gün'}</b> içinde sona erecek.
+    </p>
+    <div style="background:#fff5f0;border:1px solid #ffd4c4;padding:14px 16px;border-radius:12px;margin:18px 0">
+      <div style="font-size:12px;color:#888;margin-bottom:4px">Bitiş tarihi</div>
+      <div style="font-size:18px;font-weight:700;color:#c2410c">${dateStr}</div>
+    </div>
+    <p style="margin:0 0 18px;line-height:1.5">Kesintisiz kullanmak için süreyi uzatabilirsin.</p>
+    <a href="${packUrl}" style="display:inline-block;background:linear-gradient(135deg,#FF6B4A,#FFB020);color:#1A0A06;padding:14px 22px;border-radius:10px;font-weight:700;text-decoration:none">
+      Paketleri Gör / Süre Uzat
+    </a>
+    <p style="color:#999;font-size:12px;margin-top:28px">MalikYayın — TikTok LIVE Overlay<br>Bu otomatik bir hatırlatmadır.</p>
+  </div>`;
+}
+
+async function sendReminderMail(to, name, daysLeft, expiresAt) {
+  const urgent = daysLeft <= 1;
+  const subject = urgent
+    ? 'MalikYayin — Lisansin yarin bitiyor!'
+    : 'MalikYayin — Lisansin yakinda bitiyor (3 gun)';
+  const html = reminderEmailHtml(name, daysLeft, expiresAt);
+  const text = `Merhaba ${name || ''}, lisansin ${daysLeft <= 1 ? 'yaklasik 1 gun' : 'yaklasik 3 gun'} icinde bitecek. Süre uzat: ${(process.env.APP_URL || 'https://malik-yayin-alpha.vercel.app').replace(/\/$/, '')}/#paketler`;
+
+  let from = (process.env.MAIL_FROM || process.env.SMTP_USER || 'MalikYayin <noreply@malikyayin.com>').trim();
+  from = from.replace(/[^\x00-\x7F]/g, '');
+  if (!from.includes('@')) {
+    const u = (process.env.SMTP_USER || '').trim();
+    from = u ? ('MalikYayin <' + u + '>') : from;
+  }
+
+  const resendKey = (process.env.RESEND_API_KEY || '').trim();
+  if (resendKey) {
+    try {
+      const resendFrom = (process.env.RESEND_FROM || from || 'MalikYayin <onboarding@resend.dev>').trim();
+      const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + resendKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ from: resendFrom, to: [to], subject, html, text }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) {
+        console.log('Reminder OK (Resend)', { to, daysLeft, id: data.id });
+        return { ok: true, messageId: data.id, via: 'resend' };
+      }
+      console.error('Reminder Resend hata:', r.status, data);
+    } catch (e) {
+      console.error('Reminder Resend exception:', e.message || e);
+    }
+  }
+
+  if (!transporter) transporter = buildTransporter();
+  if (!transporter) {
+    console.error('Reminder mail: SMTP yok');
+    return { ok: false, error: 'SMTP yok' };
+  }
+  try {
+    const info = await transporter.sendMail({ from, to, subject, html, text });
+    console.log('Reminder OK (SMTP)', { to, daysLeft, id: info.messageId });
+    return { ok: true, messageId: info.messageId, via: 'smtp' };
+  } catch (e) {
+    console.error('Reminder SMTP hata:', e.message || e);
+    return { ok: false, error: e.message || 'Mail gonderilemedi' };
+  }
 }
 
 function genCode() {
@@ -1412,17 +1493,89 @@ app.post('/api/license/refund-check', (req, res) => {
 
 
 // ============================================================
-// ADMIN — giriş + panel API
+// ADMIN — OTP ile giriş (normal kullanıcı gibi kod atar)
 // ============================================================
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/send-code', otpLimiter, async (req, res) => {
   const email = String(req.body?.email || '').toLowerCase().trim();
-  const password = String(req.body?.password || '');
-  if (!email || !password) {
-    return res.status(400).json({ error: 'E-posta ve şifre gerekli.' });
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: 'Geçerli bir e-posta girin.' });
   }
-  if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'E-posta veya şifre hatalı.' });
+  // Sadece tanımlı admin e-postasına kod gider; başka adreslere "bulunamadı" demiyoruz (enumeration önleme)
+  if (email !== ADMIN_EMAIL) {
+    // Aynı cevap — saldırgan e-posta doğrulamasın
+    return res.json({
+      ok: true,
+      message: 'Kod gönderildiyse e-postanı kontrol et (spam dahil).',
+      otpToken: null,
+    });
   }
+
+  const code = genCode();
+  const expiresAt = Date.now() + 10 * 60 * 1000;
+  const otpToken = createOtpToken({ purpose: 'admin', email, code, exp: expiresAt });
+
+  try {
+    db.get('otps').remove({ email }).write();
+    db.get('otps').push({ email, code, expiresAt, attempts: 0, purpose: 'admin' }).write();
+  } catch (e) {}
+
+  const mail = await sendOtpMail(email, 'Admin', code, 'admin');
+  if (!mail.ok) {
+    try { db.get('otps').remove({ email }).write(); } catch (e) {}
+    return res.status(500).json({ error: mail.error || 'Kod gönderilemedi, SMTP ayarlarını kontrol edin.' });
+  }
+
+  const payload = {
+    ok: true,
+    otpToken,
+    message: 'Admin giriş kodu e-postana gönderildi. Spam klasörüne bak.',
+    via: mail.via || null,
+  };
+  if (process.env.OTP_RETURN_CODE === '1' || process.env.OTP_DEBUG === '1' || mail.debug) {
+    payload.devCode = code;
+  }
+  res.json(payload);
+});
+
+app.post('/api/admin/login', otpLimiter, async (req, res) => {
+  const email = String(req.body?.email || '').toLowerCase().trim();
+  const code = String(req.body?.code || '').trim();
+  const otpToken = String(req.body?.otpToken || '');
+
+  if (!email || !code) {
+    return res.status(400).json({ error: 'E-posta ve kod gerekli.' });
+  }
+  if (email !== ADMIN_EMAIL) {
+    return res.status(401).json({ error: 'E-posta veya kod hatalı.' });
+  }
+
+  let codeOk = false;
+  const tokenData = readOtpToken(otpToken);
+  if (tokenData && tokenData.purpose === 'admin' && tokenData.email === email) {
+    codeOk = String(tokenData.code) === String(code);
+    if (!codeOk) return res.status(400).json({ error: 'Kod hatalı.' });
+  } else {
+    const record = db.get('otps').find({ email }).value();
+    if (!record || record.purpose !== 'admin') {
+      return res.status(400).json({ error: 'Önce e-posta ile kod iste.' });
+    }
+    if (record.attempts >= 5) {
+      return res.status(429).json({ error: 'Çok fazla yanlış deneme. Yeni kod iste.' });
+    }
+    if (Date.now() > record.expiresAt) {
+      return res.status(400).json({ error: 'Kodun süresi doldu, yeni kod iste.' });
+    }
+    if (String(record.code) !== String(code)) {
+      db.get('otps').find({ email }).assign({ attempts: (record.attempts || 0) + 1 }).write();
+      return res.status(400).json({ error: 'Kod hatalı.' });
+    }
+    codeOk = true;
+  }
+
+  if (!codeOk) return res.status(401).json({ error: 'E-posta veya kod hatalı.' });
+
+  try { db.get('otps').remove({ email }).write(); } catch (e) {}
+
   const token = jwt.sign(
     { role: 'admin', email: ADMIN_EMAIL },
     JWT_SECRET,
@@ -1625,6 +1778,7 @@ app.post('/api/admin/license/grant', adminAuth, async (req, res) => {
     activatedAt,
     expiresAt,
     active: true,
+    remindersSent: {},
   };
 
   db.get('users').find({ email }).assign({ license }).write();
@@ -1658,7 +1812,7 @@ app.post('/api/admin/license/extend', adminAuth, async (req, res) => {
   if (!user || !user.license || !user.license.key) {
     return res.status(404).json({ error: 'Kullanıcı veya lisans bulunamadı.' });
   }
-  const lic = { ...user.license, active: true };
+  const lic = { ...user.license, active: true, remindersSent: {} };
   const base = lic.expiresAt && lic.expiresAt > Date.now() ? lic.expiresAt : Date.now();
   if (!lic.activatedAt) {
     lic.durationDays = Number(lic.durationDays || 0) + extraDays;
@@ -1852,6 +2006,7 @@ app.post('/api/payment/paytr/callback', async (req, res) => {
             activatedAt: null,
             expiresAt: null,
             active: true,
+            remindersSent: {},
           },
         })
         .write();
@@ -1871,6 +2026,120 @@ app.post('/api/payment/paytr/callback', async (req, res) => {
   }
 
   res.send('OK');
+});
+
+// ============================================================
+// CRON — süre bitmeden hatırlatma mailleri (3 gün + 1 gün)
+// Vercel Cron veya harici cron (cron-job.org) ile günde 1-2 kez çağır:
+//   GET/POST /api/cron/reminders?secret=CRON_SECRET
+//   Header: Authorization: Bearer CRON_SECRET
+// Env: CRON_SECRET=uzun-gizli-deger
+// ============================================================
+function checkCronSecret(req) {
+  const secret = (process.env.CRON_SECRET || '').trim();
+  if (!secret) return false;
+  const q = String(req.query?.secret || '').trim();
+  if (q && q === secret) return true;
+  const h = req.headers.authorization || '';
+  if (h.startsWith('Bearer ') && h.slice(7).trim() === secret) return true;
+  const x = String(req.headers['x-cron-secret'] || '').trim();
+  if (x && x === secret) return true;
+  return false;
+}
+
+async function runExpiryReminders() {
+  try { await ensureDb(true); } catch (e) {}
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  const users = db.get('users').value() || [];
+  const results = { checked: 0, sent3: 0, sent1: 0, skipped: 0, errors: [] };
+
+  for (const u of users) {
+    const lic = u.license;
+    if (!lic || !lic.expiresAt || lic.active === false) {
+      results.skipped++;
+      continue;
+    }
+    const exp = Number(lic.expiresAt);
+    if (!exp || exp <= now) {
+      results.skipped++;
+      continue;
+    }
+    results.checked++;
+    const msLeft = exp - now;
+    const daysLeft = msLeft / DAY;
+    const sent = (lic.remindersSent && typeof lic.remindersSent === 'object')
+      ? { ...lic.remindersSent }
+      : {};
+
+    // ~3 gün kala (2.4 – 3.6 gün aralığı, günde 1-2 cron için güvenli)
+    let need3 = daysLeft >= 2.4 && daysLeft <= 3.6 && !sent.d3;
+    // ~1 gün kala (0.4 – 1.6 gün)
+    let need1 = daysLeft >= 0.4 && daysLeft <= 1.6 && !sent.d1;
+
+    if (!need3 && !need1) continue;
+
+    const name = u.name || String(u.email || '').split('@')[0];
+    const email = String(u.email || '').toLowerCase().trim();
+    if (!email) continue;
+
+    if (need3) {
+      const mail = await sendReminderMail(email, name, 3, exp);
+      if (mail.ok) {
+        sent.d3 = now;
+        results.sent3++;
+      } else {
+        results.errors.push({ email, type: 'd3', error: mail.error });
+      }
+    }
+    if (need1) {
+      const mail = await sendReminderMail(email, name, 1, exp);
+      if (mail.ok) {
+        sent.d1 = now;
+        results.sent1++;
+      } else {
+        results.errors.push({ email, type: 'd1', error: mail.error });
+      }
+    }
+
+    if (sent.d3 || sent.d1) {
+      const nextLic = { ...lic, remindersSent: sent };
+      db.get('users').find({ email: u.email }).assign({ license: nextLic }).write();
+    }
+  }
+
+  if (results.sent3 || results.sent1) {
+    try { await saveDb(); } catch (e) {
+      console.error('reminder saveDb:', e.message);
+    }
+  }
+  return results;
+}
+
+app.get('/api/cron/reminders', async (req, res) => {
+  if (!checkCronSecret(req)) {
+    return res.status(401).json({ error: 'Yetkisiz. CRON_SECRET gerekli.' });
+  }
+  try {
+    const results = await runExpiryReminders();
+    res.json({ ok: true, ...results, at: new Date().toISOString() });
+  } catch (e) {
+    console.error('cron reminders:', e);
+    res.status(500).json({ error: e.message || 'Cron hatası' });
+  }
+});
+
+app.post('/api/cron/reminders', async (req, res) => {
+  if (!checkCronSecret(req)) {
+    return res.status(401).json({ error: 'Yetkisiz. CRON_SECRET gerekli.' });
+  }
+  try {
+    const results = await runExpiryReminders();
+    res.json({ ok: true, ...results, at: new Date().toISOString() });
+  } catch (e) {
+    console.error('cron reminders:', e);
+    res.status(500).json({ error: e.message || 'Cron hatası' });
+  }
 });
 
 // APK indirme — GitHub Release'e yönlendirir

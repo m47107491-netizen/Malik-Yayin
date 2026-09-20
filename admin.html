@@ -77,13 +77,22 @@ code{background:#0A101C;padding:3px 7px;border-radius:6px;font-size:11.5px;borde
   <div class="login-card">
     <div class="logo"><span class="dot"></span>MalikYayin</div>
     <h1 style="font-size:22px;margin:16px 0 6px">Admin Panel</h1>
-    <p class="muted" style="margin:0 0 20px">Yonetici e-posta ve sifre ile giris</p>
-    <label>E-posta</label>
-    <input id="email" type="email" value="maliksponsorluk@gmail.com" autocomplete="username">
-    <label>Sifre</label>
-    <input id="pass" type="password" placeholder="Sifreni yaz" autocomplete="current-password">
-    <div class="msg err" id="login-err"></div>
-    <button class="btn btn-primary btn-block" id="login-btn" type="button" onclick="doLogin()">Giris Yap</button>
+    <p class="muted" style="margin:0 0 20px">E-postana kod gonderilir, kod ile giris yaparsin</p>
+    <div id="admin-phase-email">
+      <label>E-posta</label>
+      <input id="email" type="email" value="maliksponsorluk@gmail.com" autocomplete="username">
+      <div class="msg err" id="login-err"></div>
+      <button class="btn btn-primary btn-block" id="send-code-btn" type="button" onclick="sendAdminCode()">Kod Gonder</button>
+    </div>
+    <div id="admin-phase-code" style="display:none">
+      <label>E-posta</label>
+      <input id="email-locked" type="email" disabled style="opacity:.7">
+      <label style="margin-top:12px">Dogrulama kodu</label>
+      <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" style="letter-spacing:8px;font-size:20px;text-align:center;font-family:'Space Grotesk',sans-serif">
+      <div class="msg err" id="code-err"></div>
+      <button class="btn btn-primary btn-block" id="login-btn" type="button" onclick="doLogin()">Giris Yap</button>
+      <button class="btn btn-ghost btn-block" type="button" style="margin-top:8px" onclick="backToEmail()">&larr; E-postayi degistir / yeniden kod</button>
+    </div>
     <div class="hint">Kullanici girisi icin <a href="giris.html" style="color:var(--cyan)">giris.html</a></div>
   </div>
 </div>
@@ -188,15 +197,57 @@ function authHeaders(){return{'Content-Type':'application/json',Authorization:'B
 function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmtDate(ts){if(!ts)return '-';try{return new Date(ts).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return '-'}}
 function copyText(t){if(!t)return;navigator.clipboard.writeText(t).then(()=>alert('Kopyalandi')).catch(()=>prompt('Kopyala:',t))}
+let adminOtpToken='';
+async function sendAdminCode(){
+  const email=document.getElementById('email').value.trim();
+  const err=document.getElementById('login-err');
+  err.textContent='';
+  if(!email){err.textContent='E-posta gerekli.';return}
+  const btn=document.getElementById('send-code-btn');
+  btn.disabled=true;btn.textContent='Kod gonderiliyor...';
+  try{
+    const r=await fetch(API_BASE+'/api/admin/send-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(data.error||'Kod gonderilemedi');
+    adminOtpToken=data.otpToken||'';
+    document.getElementById('email-locked').value=email;
+    document.getElementById('admin-phase-email').style.display='none';
+    document.getElementById('admin-phase-code').style.display='block';
+    document.getElementById('code').value='';
+    document.getElementById('code-err').textContent='';
+    document.getElementById('code').focus();
+  }catch(e){
+    err.textContent=e.message==='Failed to fetch'?'Sunucuya baglanilamadi.':e.message;
+  }finally{
+    btn.disabled=false;btn.textContent='Kod Gonder';
+  }
+}
+function backToEmail(){
+  document.getElementById('admin-phase-code').style.display='none';
+  document.getElementById('admin-phase-email').style.display='block';
+  adminOtpToken='';
+  document.getElementById('code-err').textContent='';
+  document.getElementById('login-err').textContent='';
+}
 async function doLogin(){
-  const email=document.getElementById('email').value.trim(),password=document.getElementById('pass').value,err=document.getElementById('login-err');
-  err.textContent='';if(!email||!password){err.textContent='E-posta ve sifre gerekli.';return}
+  const email=(document.getElementById('email-locked').value||document.getElementById('email').value).trim();
+  const code=document.getElementById('code').value.trim();
+  const err=document.getElementById('code-err');
+  err.textContent='';
+  if(!email||!code){err.textContent='E-posta ve kod gerekli.';return}
   const btn=document.getElementById('login-btn');btn.disabled=true;btn.textContent='Giris...';
-  try{const r=await fetch(API_BASE+'/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
-  const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||'Giris basarisiz');
-  localStorage.setItem(TOKEN_KEY,data.token);localStorage.setItem('my_admin_email',data.email||email);openPanel()}
-  catch(e){err.textContent=e.message==='Failed to fetch'?'Sunucuya baglanilamadi.':e.message}
-  finally{btn.disabled=false;btn.textContent='Giris Yap'}
+  try{
+    const r=await fetch(API_BASE+'/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,code,otpToken:adminOtpToken})});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(data.error||'Giris basarisiz');
+    localStorage.setItem(TOKEN_KEY,data.token);
+    localStorage.setItem('my_admin_email',data.email||email);
+    openPanel();
+  }catch(e){
+    err.textContent=e.message==='Failed to fetch'?'Sunucuya baglanilamadi.':e.message;
+  }finally{
+    btn.disabled=false;btn.textContent='Giris Yap';
+  }
 }
 function logout(){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem('my_admin_email');document.getElementById('panel-view').classList.add('hidden');document.getElementById('login-view').classList.remove('hidden')}
 function openPanel(){document.getElementById('login-view').classList.add('hidden');document.getElementById('panel-view').classList.remove('hidden');document.getElementById('admin-email').textContent=localStorage.getItem('my_admin_email')||'';goPage('dash');refresh()}
