@@ -620,7 +620,9 @@
     // Admin: panel sitede (iframe), ayrı sayfaya gitmez
     wrap.style.display = 'block';
     if(userWrap) userWrap.style.display = 'none';
-    frame.src = 'admin.html?embed=1&t=' + Date.now();
+    const btn = document.getElementById('admin-embed-toggle');
+    if(btn) btn.textContent = 'Hesabım';
+    frame.src = 'admin.html?embed=1&t=' + encodeURIComponent(Date.now());
   }
 
   function toggleAdminEmbed(){
